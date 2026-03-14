@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AthleteAI — Athlete Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#04080f; --surface:#080f1c; --surface2:#0d1828; --surface3:#111f35;
+    --border:#162034; --cyan:#00d4ff; --purple:#8b5cf6; --amber:#f59e0b;
+    --green:#10b981; --red:#ef4444; --text:#e8f0fe; --muted:#5a7090;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;min-height:100vh;}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,0.025) 1px,transparent 1px);background-size:50px 50px;pointer-events:none;z-index:0;}
+
+  /* NAV */
+  nav{position:sticky;top:0;z-index:100;background:rgba(4,8,15,0.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:.875rem 2rem;}
+  .nav-brand{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;background:linear-gradient(135deg,var(--cyan),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:1px;}
+  .nav-right{display:flex;align-items:center;gap:1rem;}
+  .nav-role-badge{display:flex;align-items:center;gap:.4rem;padding:.3rem .875rem;border-radius:20px;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.3);color:var(--cyan);font-family:'JetBrains Mono',monospace;font-size:.68rem;font-weight:500;}
+  .role-dot{width:6px;height:6px;border-radius:50%;background:var(--cyan);animation:pulse 2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+  .nav-user{display:flex;align-items:center;gap:.75rem;color:var(--muted);font-size:.875rem;}
+  .avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),#0096b3);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:.9rem;color:#000;}
+  .nav-btn{background:none;border:1px solid var(--border);color:var(--muted);font-family:'Outfit',sans-serif;font-size:.82rem;padding:.4rem 1rem;border-radius:6px;cursor:pointer;transition:all .2s;}
+  .nav-btn:hover{color:var(--text);border-color:var(--cyan);}
+
+  /* LAYOUT */
+  .layout{display:grid;grid-template-columns:200px 1fr;min-height:calc(100vh - 53px);position:relative;z-index:1;}
+  .sidebar{background:var(--surface);border-right:1px solid var(--border);padding:1.25rem 0;position:sticky;top:53px;height:calc(100vh - 53px);overflow-y:auto;}
+  .sidebar-label{font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;padding:.5rem .875rem;margin-bottom:.25rem;}
+  .sidebar-item{display:flex;align-items:center;gap:.75rem;padding:.6rem .875rem;margin:0 .5rem;border-radius:8px;color:var(--muted);cursor:pointer;transition:all .2s;font-size:.875rem;border:none;background:none;width:calc(100% - 1rem);text-align:left;}
+  .sidebar-item:hover{color:var(--text);background:var(--surface2);}
+  .sidebar-item.active{color:var(--cyan);background:rgba(0,212,255,.08);font-weight:500;}
+  .content{padding:2rem;overflow-y:auto;}
+  .page-title{font-family:'Bebas Neue',sans-serif;font-size:2rem;letter-spacing:1px;margin-bottom:.2rem;}
+  .page-sub{color:var(--muted);font-size:.875rem;margin-bottom:2rem;}
+
+  /* CARDS */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;transition:border-color .2s;}
+  .card:hover{border-color:rgba(0,212,255,.2);}
+
+  /* STATS */
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:1rem;margin-bottom:2rem;}
+  .stat-card{text-align:center;padding:1.5rem 1rem;}
+  .stat-icon{font-size:1.75rem;margin-bottom:.5rem;}
+  .stat-val{font-family:'Bebas Neue',sans-serif;font-size:2.75rem;line-height:1;background:linear-gradient(135deg,var(--text),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+  .stat-label{font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:.25rem;}
+
+  /* BUTTONS */
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;padding:.65rem 1.5rem;border-radius:8px;border:none;font-family:'Outfit',sans-serif;font-size:.875rem;font-weight:600;cursor:pointer;transition:all .2s;}
+  .btn-primary{background:linear-gradient(135deg,var(--cyan),#0096b3);color:#000;}
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,212,255,.3);}
+  .btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+  .btn-ghost:hover{border-color:var(--cyan);}
+  .btn-sm{padding:.35rem .875rem;font-size:.78rem;border-radius:6px;}
+  .btn:disabled{opacity:.4;cursor:not-allowed;transform:none !important;}
+
+  /* TABLE */
+  .tbl{width:100%;border-collapse:collapse;}
+  .tbl th{text-align:left;padding:.7rem 1rem;font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);}
+  .tbl td{padding:.85rem 1rem;border-bottom:1px solid rgba(22,32,52,.7);font-size:.875rem;}
+  .tbl tr:hover td{background:var(--surface2);}
+
+  /* BADGES */
+  .badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:.7rem;font-weight:500;font-family:'JetBrains Mono',monospace;}
+  .badge-cyan{background:rgba(0,212,255,.1);color:var(--cyan);border:1px solid rgba(0,212,255,.25);}
+  .badge-green{background:rgba(16,185,129,.12);color:var(--green);border:1px solid rgba(16,185,129,.25);}
+  .badge-amber{background:rgba(245,158,11,.12);color:var(--amber);border:1px solid rgba(245,158,11,.25);}
+  .badge-red{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.25);}
+  .badge-purple{background:rgba(139,92,246,.12);color:var(--purple);border:1px solid rgba(139,92,246,.25);}
+
+  /* PROGRESS */
+  .prog-bar{height:5px;background:var(--surface3);border-radius:3px;overflow:hidden;}
+  .prog-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--cyan),var(--purple));}
+
+  /* UPLOAD */
+  .upload-zone{border:2px dashed var(--border);border-radius:12px;padding:2.5rem;text-align:center;cursor:pointer;transition:all .3s;position:relative;}
+  .upload-zone:hover,.upload-zone.over{border-color:var(--cyan);background:rgba(0,212,255,.03);}
+  .upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;}
+
+  .exercise-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.75rem;}
+  .ex-btn{background:var(--surface2);border:2px solid var(--border);border-radius:10px;padding:.875rem .75rem;text-align:center;cursor:pointer;transition:all .2s;}
+  .ex-btn:hover{border-color:rgba(0,212,255,.3);}
+  .ex-btn.selected{border-color:var(--cyan);background:rgba(0,212,255,.06);}
+  .ex-icon{font-size:1.75rem;margin-bottom:.4rem;}
+  .ex-name{font-size:.78rem;font-weight:600;color:var(--text);}
+
+  /* PROCESSING */
+  .overlay{position:fixed;inset:0;background:rgba(4,8,15,.92);z-index:200;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(12px);}
+  .proc-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:2.5rem;text-align:center;width:360px;}
+  .spinner{width:56px;height:56px;border-radius:50%;border:3px solid var(--border);border-top-color:var(--cyan);animation:spin 1s linear infinite;margin:0 auto 1.5rem;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .proc-title{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;letter-spacing:1px;margin-bottom:.4rem;}
+  .proc-step{color:var(--muted);font-size:.78rem;font-family:'JetBrains Mono',monospace;margin-bottom:1.5rem;}
+  .prog-bar-proc{height:4px;background:var(--surface2);border-radius:2px;overflow:hidden;margin-bottom:1rem;}
+  .prog-fill-proc{height:100%;background:linear-gradient(90deg,var(--purple),var(--cyan));border-radius:2px;transition:width .5s;}
+
+  /* RESULT */
+  .result-hero{background:linear-gradient(135deg,var(--surface2),var(--surface3));border:1px solid rgba(0,212,255,.2);border-radius:16px;padding:2rem;margin-bottom:1.5rem;position:relative;overflow:hidden;}
+  .result-hero::after{content:'';position:absolute;top:-40%;right:-5%;width:250px;height:250px;border-radius:50%;background:radial-gradient(circle,rgba(0,212,255,.08),transparent 70%);}
+  .result-grade{font-family:'Bebas Neue',sans-serif;font-size:5rem;line-height:1;background:linear-gradient(135deg,var(--cyan),var(--purple));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+
+  /* SCORE RING */
+  .score-ring{position:relative;width:90px;height:90px;}
+  .score-ring svg{transform:rotate(-90deg);}
+  .ring-label{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:1.2rem;}
+  .ring-label small{font-size:.55rem;color:var(--muted);font-family:'JetBrains Mono',monospace;font-weight:400;text-transform:uppercase;}
+
+  /* FILTER ROW */
+  .filter-row{display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1.5rem;align-items:center;}
+  .filter-row select,.filter-row input{background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.85rem;padding:.55rem .875rem;min-width:140px;}
+  .filter-row select:focus,.filter-row input:focus{outline:none;border-color:var(--cyan);}
+  select option{background:var(--surface2);}
+
+  .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;}
+  .section-title{font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:.5px;}
+  .hidden{display:none!important;}
+  .form-group{margin-bottom:1rem;}
+  .form-group label{display:block;font-family:'JetBrains Mono',monospace;font-size:.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:.35rem;}
+  .form-group input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.9rem;padding:.7rem 1rem;transition:all .2s;}
+  .form-group input:focus{outline:none;border-color:var(--cyan);box-shadow:0 0 0 3px rgba(0,212,255,.1);}
+  #toast-c{position:fixed;bottom:2rem;right:2rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem;}
+  .toast{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.7rem 1rem;font-size:.85rem;min-width:260px;animation:tIn .3s ease;display:flex;align-items:center;gap:.5rem;}
+  .toast.ok{border-color:var(--green);}.toast.err{border-color:var(--red);}
+  @keyframes tIn{from{transform:translateX(80px);opacity:0;}}
+
+  .cheat-alert{background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:1rem 1.25rem;display:flex;gap:1rem;align-items:flex-start;margin-bottom:1.5rem;}
+  .instruction-step{display:flex;gap:1rem;align-items:flex-start;padding:.875rem 0;border-bottom:1px solid var(--border);}
+  .step-num{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),var(--purple));display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:.8rem;color:#000;flex-shrink:0;}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-brand">AthleteAI</div>
+  <div class="nav-right">
+    <div class="nav-role-badge"><span class="role-dot"></span>ATHLETE</div>
+    <div class="nav-user">
+      <div class="avatar" id="nav-avatar">?</div>
+      <span id="nav-name">Athlete</span>
+    </div>
+    <button class="nav-btn" onclick="logout()">Sign Out</button>
+  </div>
+</nav>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-label">Menu</div>
+    <button class="sidebar-item active" id="sn-dashboard" onclick="showSec('dashboard')">📊 Dashboard</button>
+    <button class="sidebar-item" id="sn-upload"    onclick="showSec('upload')">📤 New Test</button>
+    <button class="sidebar-item" id="sn-history"   onclick="showSec('history')">📋 My Results</button>
+    <button class="sidebar-item" id="sn-profile"   onclick="showSec('profile')">👤 Profile</button>
+  </aside>
+
+  <main class="content">
+
+    <!-- DASHBOARD -->
+    <section id="sec-dashboard">
+      <div class="page-title">My Dashboard</div>
+      <p class="page-sub">Your fitness performance at a glance</p>
+      <div class="stats-grid">
+        <div class="card stat-card"><div class="stat-icon">🏅</div><div class="stat-val" id="st-reps">—</div><div class="stat-label">Best Reps</div></div>
+        <div class="card stat-card"><div class="stat-icon">⭐</div><div class="stat-val" id="st-score">—</div><div class="stat-label">Avg Form</div></div>
+        <div class="card stat-card"><div class="stat-icon">📈</div><div class="stat-val" id="st-tests">—</div><div class="stat-label">Tests Done</div></div>
+        <div class="card stat-card"><div class="stat-icon">🎯</div><div class="stat-val" id="st-level">—</div><div class="stat-label">My Level</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
+        <div class="card"><div class="section-header"><span class="section-title">Form Score Trend</span><span style="font-size:.75rem;color:var(--muted)">Last 10 tests</span></div><canvas id="trend-chart" height="160"></canvas></div>
+        <div class="card"><div class="section-header"><span class="section-title">Exercise Mix</span></div><canvas id="dist-chart" height="160"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="section-header"><span class="section-title">Recent Tests</span><button class="btn btn-ghost btn-sm" onclick="showSec('history')">View All →</button></div>
+        <div id="recent-table"><div style="text-align:center;padding:2rem;color:var(--muted)">No tests yet. <a href="#" onclick="showSec('upload')" style="color:var(--cyan)">Upload your first video →</a></div></div>
+      </div>
+    </section>
+
+    <!-- UPLOAD -->
+    <section id="sec-upload" class="hidden">
+      <div class="page-title">New Fitness Test</div>
+      <p class="page-sub">Upload a video and let AI analyze your movement</p>
+      <div style="display:grid;grid-template-columns:1fr 320px;gap:1.5rem">
+        <div>
+          <div class="card" style="margin-bottom:1rem">
+            <div class="section-title" style="margin-bottom:1rem">1 — Choose Exercise</div>
+            <div class="exercise-grid">
+              <div class="ex-btn selected" data-ex="pushup" onclick="selectEx(this)"><div class="ex-icon">💪</div><div class="ex-name">Push-ups</div></div>
+              <div class="ex-btn" data-ex="squat" onclick="selectEx(this)"><div class="ex-icon">🏋️</div><div class="ex-name">Squats</div></div>
+              <div class="ex-btn" data-ex="vertical_jump" onclick="selectEx(this)"><div class="ex-icon">🦘</div><div class="ex-name">Vertical Jump</div></div>
+              <div class="ex-btn" data-ex="jumping_jack" onclick="selectEx(this)"><div class="ex-icon">⭐</div><div class="ex-name">Jumping Jacks</div></div>
+              <div class="ex-btn" data-ex="situp" onclick="selectEx(this)"><div class="ex-icon">🤸</div><div class="ex-name">Sit-ups</div></div>
+              <div class="ex-btn" data-ex="lunge" onclick="selectEx(this)"><div class="ex-icon">🚶</div><div class="ex-name">Lunges</div></div>
+            </div>
+          </div>
+          <div class="card" style="margin-bottom:1rem">
+            <div class="section-title" style="margin-bottom:1rem">2 — Upload Video</div>
+            <div class="upload-zone" id="drop-zone" ondragover="event.preventDefault();this.classList.add('over')" ondragleave="this.classList.remove('over')" ondrop="handleDrop(event)">
+              <input type="file" id="video-file" accept="video/*" onchange="setFile(event.target.files[0])">
+              <div style="font-size:2.5rem;margin-bottom:.75rem">🎥</div>
+              <div id="upload-label" style="font-weight:600;margin-bottom:.35rem">Drop video here or click to browse</div>
+              <div style="font-size:.8rem;color:var(--muted)">MP4, MOV, WebM · Max 200 MB · 10–120 seconds</div>
+            </div>
+            <div id="file-info" class="hidden" style="margin-top:1rem;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between">
+              <div><div style="font-weight:500;font-size:.875rem" id="file-name"></div><div style="font-size:.75rem;color:var(--muted)" id="file-size"></div></div>
+              <button class="btn btn-ghost btn-sm" onclick="clearFile()">✕ Remove</button>
+            </div>
+          </div>
+          <button class="btn btn-primary" style="width:100%;padding:1rem;font-size:1rem" id="submit-btn" onclick="submitVideo()" disabled>🚀 Analyze Video</button>
+        </div>
+        <div>
+          <div class="card" style="position:sticky;top:70px">
+            <div class="section-title" style="margin-bottom:.875rem">📋 Tips</div>
+            <div class="instruction-step"><div class="step-num">1</div><div><div style="font-weight:500;font-size:.85rem">Side view camera</div><div style="color:var(--muted);font-size:.75rem;margin-top:2px">3–6 ft away, full body visible</div></div></div>
+            <div class="instruction-step"><div class="step-num">2</div><div><div style="font-weight:500;font-size:.85rem">Good lighting</div><div style="color:var(--muted);font-size:.75rem;margin-top:2px">Avoid backlighting</div></div></div>
+            <div class="instruction-step"><div class="step-num">3</div><div><div style="font-weight:500;font-size:.85rem">Face visible</div><div style="color:var(--muted);font-size:.75rem;margin-top:2px">Required for identity check</div></div></div>
+            <div class="instruction-step" style="border:none"><div class="step-num">4</div><div><div style="font-weight:500;font-size:.85rem">10–120 seconds</div><div style="color:var(--muted);font-size:.75rem;margin-top:2px">Perform exercise naturally</div></div></div>
+            <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0">
+            <div style="font-size:.75rem;color:var(--muted);margin-bottom:.5rem;font-weight:500">AI detects:</div>
+            <div style="display:flex;flex-wrap:wrap;gap:.35rem">
+              <span class="badge badge-cyan">Rep Count</span>
+              <span class="badge badge-purple">Form Score</span>
+              <span class="badge badge-green">ROM</span>
+              <span class="badge badge-amber">Cheat Check</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HISTORY -->
+    <section id="sec-history" class="hidden">
+      <div class="page-title">My Results</div>
+      <p class="page-sub">All your past fitness test results</p>
+      <div class="filter-row">
+        <select id="f-exercise" onchange="loadHistory()"><option value="">All Exercises</option><option value="pushup">Push-ups</option><option value="squat">Squats</option><option value="vertical_jump">Vertical Jump</option><option value="jumping_jack">Jumping Jacks</option><option value="situp">Sit-ups</option></select>
+        <select id="f-level" onchange="loadHistory()"><option value="">All Levels</option><option>Advanced</option><option>Intermediate</option><option>Beginner</option></select>
+        <button class="btn btn-ghost btn-sm" onclick="loadHistory()">🔄 Refresh</button>
+      </div>
+      <div class="card">
+        <table class="tbl">
+          <thead><tr><th>Exercise</th><th>Date</th><th>Reps</th><th>Form Score</th><th>Level</th><th>Grade</th><th>Cheat?</th><th></th></tr></thead>
+          <tbody id="history-body"><tr><td colspan="8" style="text-align:center;color:var(--muted);padding:2rem">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- RESULT DETAIL -->
+    <section id="sec-result" class="hidden">
+      <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem">
+        <button class="btn btn-ghost btn-sm" onclick="showSec('history')">← Back</button>
+        <div class="page-title" style="margin-bottom:0" id="result-title">Result</div>
+      </div>
+      <div id="result-body">Loading...</div>
+    </section>
+
+    <!-- PROFILE -->
+    <section id="sec-profile" class="hidden">
+      <div class="page-title">My Profile</div>
+      <p class="page-sub">Manage your account details</p>
+      <div style="max-width:480px">
+        <div class="card">
+          <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem">
+            <div class="avatar" style="width:52px;height:52px;font-size:1.1rem" id="p-avatar">?</div>
+            <div><div style="font-weight:600;font-size:1rem" id="p-name-show"></div><div style="color:var(--muted);font-size:.85rem" id="p-email-show"></div></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.875rem">
+            <div class="form-group"><label>Full Name</label><input type="text" id="p-name"></div>
+            <div class="form-group"><label>Age</label><input type="number" id="p-age"></div>
+            <div class="form-group"><label>Height (cm)</label><input type="number" id="p-height"></div>
+            <div class="form-group"><label>Weight (kg)</label><input type="number" id="p-weight"></div>
+          </div>
+          <button class="btn btn-primary" onclick="saveProfile()">Save Changes</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- PROCESSING OVERLAY -->
+<div class="overlay hidden" id="proc-overlay">
+  <div class="proc-card">
+    <div class="spinner"></div>
+    <div class="proc-title">Analyzing Video</div>
+    <div class="proc-step" id="proc-step">Uploading...</div>
+    <div class="prog-bar-proc"><div class="prog-fill-proc" id="proc-prog" style="width:0%"></div></div>
+    <div style="color:var(--muted);font-size:.75rem">AI pose detection in progress</div>
+  </div>
+</div>
+
+<div id="toast-c"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+const API = 'http://localhost:8000/api';
+const token = localStorage.getItem('token');
+const user  = JSON.parse(localStorage.getItem('user') || 'null');
+let selectedEx = 'pushup', selectedFile = null, charts = {};
+
+// Guard — redirect if not logged in or wrong role
+if (!token || !user) { window.location.href = 'login.html'; }
+else if (user.role === 'admin') { window.location.href = 'admin.html'; }
+else {
+  document.getElementById('nav-avatar').textContent = user.name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
+  document.getElementById('nav-name').textContent = user.name;
+  showSec('dashboard');
+}
+
+function logout() {
+  localStorage.removeItem('token'); localStorage.removeItem('user');
+  window.location.href = 'login.html';
+}
+
+async function api(method, path, body=null, isForm=false) {
+  const h = { Authorization: `Bearer ${token}` };
+  if (body && !isForm) h['Content-Type'] = 'application/json';
+  try {
+    const r = await fetch(`${API}${path}`, { method, headers: h, body: isForm ? body : (body ? JSON.stringify(body) : null) });
+    if (r.status === 401) { logout(); return null; }
+    if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.detail||`Error ${r.status}`); }
+    return await r.json();
+  } catch(e) {
+    if (e.message.includes('fetch')||e.message.includes('Failed')||e.message.includes('Network')) return demoFallback(method, path, body);
+    throw e;
+  }
+}
+
+// ── Demo data ──────────────────────────────────────────────────────────────
+function demoFallback(method, path, body) {
+  if (path==='/results') return mkResults();
+  if (path.includes('/sessions/upload')) return {session_id:'s1',job_id:'j1'};
+  if (path.includes('/jobs/')) return {status:'completed',progress:100};
+  if (path.includes('/result')) return mkDetail();
+  if (path.includes('/results/')) return mkDetail();
+  if (path==='/auth/me') return user;
+  if (path==='/profile') return {success:true};
+  return {};
+}
+function mkResults() {
+  const ex=['pushup','squat','vertical_jump','jumping_jack'], lv=['Beginner','Intermediate','Advanced'], gr=['A','B','C'];
+  return Array.from({length:8},(_,i)=>({
+    id:'r'+i, exercise_type:ex[i%4], total_reps:15+i*3,
+    avg_correctness_score:65+i*4, duration_seconds:30+i*2, reps_per_minute:30+i,
+    fitness_level:lv[i%3], form_grade:gr[i%3], estimated_percentile:40+i*5,
+    jump_height_cm:i%4===2?42+i:null, cheat_detected:i===1?1:0, cheat_reasons:i===1?['Face hidden 60% of frames']:[],
+    created_at:new Date(Date.now()-i*86400000*3).toISOString(),
+    performance_metrics:{fitness_level:lv[i%3],form_grade:gr[i%3],estimated_percentile:40+i*5,
+      benchmarks:{beginner:10,intermediate:25,advanced:40},metric_value:15+i*3,metric_unit:'reps'}
+  }));
+}
+function mkDetail() {
+  return {id:'r0',exercise_type:'pushup',total_reps:28,avg_correctness_score:84.2,
+    duration_seconds:45,reps_per_minute:37,fitness_level:'Intermediate',form_grade:'B',
+    estimated_percentile:65,jump_height_cm:null,cheat_detected:0,cheat_reasons:[],
+    created_at:new Date().toISOString(),
+    performance_metrics:{fitness_level:'Intermediate',form_grade:'B',estimated_percentile:65,
+      benchmarks:{beginner:10,intermediate:25,advanced:40},metric_value:28,metric_unit:'reps'}};
+}
+
+// ── Navigation ─────────────────────────────────────────────────────────────
+function showSec(s) {
+  document.querySelectorAll('[id^="sec-"]').forEach(el=>el.classList.add('hidden'));
+  document.getElementById('sec-'+s)?.classList.remove('hidden');
+  document.querySelectorAll('.sidebar-item').forEach(el=>el.classList.remove('active'));
+  document.getElementById('sn-'+s)?.classList.add('active');
+  if(s==='dashboard') loadDashboard();
+  else if(s==='history') loadHistory();
+  else if(s==='profile') loadProfile();
+}
+
+// ── Dashboard ──────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  try {
+    const res = await api('GET','/results');
+    if (!res?.length) return;
+    document.getElementById('st-reps').textContent  = Math.max(...res.map(r=>r.total_reps));
+    document.getElementById('st-score').textContent = (res.reduce((s,r)=>s+r.avg_correctness_score,0)/res.length).toFixed(0)+'%';
+    document.getElementById('st-tests').textContent = res.length;
+    document.getElementById('st-level').textContent = res[0]?.fitness_level||'—';
+    renderRecent(res.slice(0,5));
+    renderTrend(res.slice(0,10).reverse());
+    renderDist(res);
+  } catch(e){console.error(e);}
+}
+
+function renderRecent(res) {
+  const c = document.getElementById('recent-table');
+  if (!res.length) return;
+  c.innerHTML = `<table class="tbl"><thead><tr><th>Exercise</th><th>Date</th><th>Reps</th><th>Form</th><th>Grade</th></tr></thead><tbody>
+    ${res.map(r=>`<tr>
+      <td>${icon(r.exercise_type)} ${fmtEx(r.exercise_type)}</td>
+      <td style="color:var(--muted)">${fmtDate(r.created_at)}</td>
+      <td><strong>${r.total_reps}</strong></td>
+      <td>${sBar(r.avg_correctness_score)}</td>
+      <td><span class="badge ${gCol(r.form_grade)}">${r.form_grade}</span></td>
+    </tr>`).join('')}
+  </tbody></table>`;
+}
+
+function renderTrend(res) {
+  const ctx = document.getElementById('trend-chart').getContext('2d');
+  if (charts.trend) charts.trend.destroy();
+  charts.trend = new Chart(ctx,{type:'line',data:{labels:res.map(r=>fmtDate(r.created_at)),
+    datasets:[{label:'Form',data:res.map(r=>r.avg_correctness_score),borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,.07)',tension:.4,fill:true,pointRadius:3}]},
+    options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#5a7090',font:{size:10}},grid:{color:'#162034'}},y:{ticks:{color:'#5a7090',font:{size:10}},grid:{color:'#162034'},min:0,max:100}}}});
+}
+function renderDist(res) {
+  const ctx = document.getElementById('dist-chart').getContext('2d');
+  if (charts.dist) charts.dist.destroy();
+  const c={};res.forEach(r=>c[r.exercise_type]=(c[r.exercise_type]||0)+1);
+  charts.dist = new Chart(ctx,{type:'doughnut',data:{labels:Object.keys(c).map(fmtEx),
+    datasets:[{data:Object.values(c),backgroundColor:['#00d4ff','#8b5cf6','#f59e0b','#10b981','#ef4444'],borderWidth:0}]},
+    options:{responsive:true,cutout:'65%',plugins:{legend:{labels:{color:'#5a7090',font:{size:10}}}}}});
+}
+
+// ── Upload ─────────────────────────────────────────────────────────────────
+function selectEx(el) {
+  document.querySelectorAll('.ex-btn').forEach(b=>b.classList.remove('selected'));
+  el.classList.add('selected'); selectedEx = el.dataset.ex;
+}
+function handleDrop(e) {
+  e.preventDefault(); document.getElementById('drop-zone').classList.remove('over');
+  const f = e.dataTransfer.files[0];
+  if (f&&f.type.startsWith('video/')) setFile(f); else toast('Please drop a video file','err');
+}
+function setFile(f) {
+  selectedFile = f;
+  document.getElementById('upload-label').textContent = '✅ '+f.name;
+  document.getElementById('file-name').textContent = f.name;
+  document.getElementById('file-size').textContent = (f.size/1024/1024).toFixed(1)+' MB';
+  document.getElementById('file-info').classList.remove('hidden');
+  document.getElementById('submit-btn').disabled = false;
+}
+function clearFile() {
+  selectedFile=null; document.getElementById('video-file').value='';
+  document.getElementById('upload-label').textContent='Drop video here or click to browse';
+  document.getElementById('file-info').classList.add('hidden');
+  document.getElementById('submit-btn').disabled=true;
+}
+async function submitVideo() {
+  if (!selectedFile) return;
+  const ol=document.getElementById('proc-overlay'); ol.classList.remove('hidden');
+  const steps=['Uploading video...','Detecting keypoints...','Counting reps...','Scoring form...','Checking authenticity...','Building report...'];
+  let si=0; const sit=setInterval(()=>{ if(si<steps.length) document.getElementById('proc-step').textContent=steps[si++]; },2000);
+  const pf=document.getElementById('proc-prog'); let p=0;
+  const pit=setInterval(()=>{ p=Math.min(p+Math.random()*7,90); pf.style.width=p+'%'; },500);
+  try {
+    const form=new FormData(); form.append('file',selectedFile);
+    const sess=await api('POST',`/sessions/upload?exercise_type=${selectedEx}`,form,true);
+    if (!sess) throw new Error('Upload failed');
+    let tries=0;
+    while(tries<30) {
+      await sleep(2000);
+      const job=await api('GET',`/jobs/${sess.job_id}`);
+      if(job?.status==='completed'){pf.style.width='100%';break;}
+      if(job?.status==='failed') throw new Error('Processing failed');
+      tries++;
+    }
+    clearInterval(sit); clearInterval(pit); ol.classList.add('hidden');
+    await sleep(200);
+    const result=await api('GET',`/sessions/${sess.session_id}/result`);
+    if(result) showResult(result);
+    toast('Analysis complete! 🎉','ok');
+  } catch(e){ clearInterval(sit); clearInterval(pit); ol.classList.add('hidden'); toast(e.message,'err'); }
+}
+
+// ── History ────────────────────────────────────────────────────────────────
+async function loadHistory() {
+  const tb=document.getElementById('history-body');
+  tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:2rem">Loading...</td></tr>';
+  try {
+    let res=await api('GET','/results'); if(!res) return;
+    const ef=document.getElementById('f-exercise').value, lf=document.getElementById('f-level').value;
+    if(ef) res=res.filter(r=>r.exercise_type===ef);
+    if(lf) res=res.filter(r=>r.fitness_level===lf);
+    if(!res.length){tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:2rem">No results found</td></tr>';return;}
+    tb.innerHTML=res.map(r=>`<tr>
+      <td>${icon(r.exercise_type)} ${fmtEx(r.exercise_type)}</td>
+      <td style="color:var(--muted)">${fmtDate(r.created_at)}</td>
+      <td><strong>${r.total_reps}</strong></td>
+      <td>${sBar(r.avg_correctness_score)}</td>
+      <td><span class="badge ${lCol(r.fitness_level)}">${r.fitness_level||'—'}</span></td>
+      <td><span class="badge ${gCol(r.form_grade)}">${r.form_grade||'—'}</span></td>
+      <td>${r.cheat_detected?'<span class="badge badge-red">⚠️ Flag</span>':'<span class="badge badge-green">✓</span>'}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="loadResult('${r.id}')">View →</button></td>
+    </tr>`).join('');
+  } catch(e){tb.innerHTML=`<tr><td colspan="8" style="color:var(--red);text-align:center;padding:2rem">${e.message}</td></tr>`;}
+}
+
+async function loadResult(id) {
+  document.querySelectorAll('[id^="sec-"]').forEach(el=>el.classList.add('hidden'));
+  document.getElementById('sec-result').classList.remove('hidden');
+  document.getElementById('result-body').innerHTML='<div style="text-align:center;padding:3rem;color:var(--muted)">Loading...</div>';
+  try { const r=await api('GET',`/results/${id}`); if(r) showResult(r); }
+  catch(e){ showResult(mkDetail()); }
+}
+
+function showResult(r) {
+  document.querySelectorAll('[id^="sec-"]').forEach(el=>el.classList.add('hidden'));
+  document.getElementById('sec-result').classList.remove('hidden');
+  document.getElementById('result-title').textContent=`${icon(r.exercise_type)} ${fmtEx(r.exercise_type)} Result`;
+  const pm=r.performance_metrics||{};
+  document.getElementById('result-body').innerHTML=`
+    <div class="result-hero">
+      <div style="display:flex;gap:2rem;flex-wrap:wrap;align-items:flex-start">
+        <div><div style="font-size:.72rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase;margin-bottom:.5rem">Form Grade</div><div class="result-grade">${r.form_grade||'N/A'}</div></div>
+        <div style="flex:1;min-width:200px">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:1rem;margin-top:.25rem">
+            ${metricBox(r.total_reps,'Reps')}${metricBox(r.avg_correctness_score?.toFixed(0)+'%','Form Score')}${metricBox(r.duration_seconds?.toFixed(0)+'s','Duration')}${metricBox((pm.estimated_percentile||0)+'%ile','Percentile')}${r.jump_height_cm?metricBox(r.jump_height_cm+'cm','Jump Height'):''}
+          </div>
+          <div style="margin-top:1.25rem;display:flex;gap:.5rem;flex-wrap:wrap">
+            <span class="badge ${lCol(r.fitness_level)}">${r.fitness_level||'Unknown'}</span>
+            <span class="badge badge-cyan">${fmtEx(r.exercise_type)}</span>
+            <span style="font-size:.75rem;color:var(--muted)">${fmtDate(r.created_at)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    ${r.cheat_detected?`<div class="cheat-alert"><div style="font-size:1.5rem">🚨</div><div><div style="font-weight:600;color:var(--red);margin-bottom:.25rem">Authenticity Warning</div><div style="font-size:.875rem;color:var(--muted)">${(r.cheat_reasons||[]).join('. ')||'Suspicious patterns detected.'}</div></div></div>`:''}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
+      <div class="card">
+        <div class="section-title" style="margin-bottom:1rem">vs Benchmarks</div>
+        ${pm.benchmarks?Object.entries(pm.benchmarks).map(([lvl,val])=>`<div style="margin-bottom:.75rem"><div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:4px"><span style="text-transform:capitalize">${lvl}</span><span style="color:var(--muted)">${val} ${pm.metric_unit}</span></div><div class="prog-bar"><div class="prog-fill" style="width:${Math.min((pm.metric_value/val)*100,100)}%;background:${lvl==='advanced'?'var(--green)':lvl==='intermediate'?'var(--cyan)':'var(--amber)'}"></div></div></div>`).join('')+'<div style="font-size:.8rem;color:var(--muted);margin-top:.5rem">Your score: <strong style="color:var(--text)">${pm.metric_value} ${pm.metric_unit}</strong></div>'
+        :'<div style="color:var(--muted)">No benchmark data</div>'}
+      </div>
+      <div class="card">
+        <div class="section-title" style="margin-bottom:1rem">Form Analysis</div>
+        <div style="display:flex;justify-content:center;margin-bottom:1rem">${ringChart(r.avg_correctness_score)}</div>
+        <div style="font-size:.8rem;text-align:center;color:var(--muted)">${r.avg_correctness_score>=90?'🟢 Excellent form':r.avg_correctness_score>=75?'🟡 Good, minor issues':r.avg_correctness_score>=60?'🟠 Needs work':'🔴 Significant issues'}</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:.75rem">
+      <button class="btn btn-primary" onclick="showSec('upload')">📹 New Test</button>
+      <button class="btn btn-ghost" onclick="showSec('history')">← All Results</button>
+    </div>`;
+}
+
+function metricBox(val,label){return`<div><div style="font-family:'Bebas Neue',sans-serif;font-size:1.75rem;line-height:1">${val}</div><div style="font-size:.65rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase;margin-top:3px">${label}</div></div>`;}
+
+// ── Profile ────────────────────────────────────────────────────────────────
+async function loadProfile() {
+  try {
+    const u=await api('GET','/auth/me')||user;
+    const ini=u.name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
+    document.getElementById('p-avatar').textContent=ini;
+    document.getElementById('p-name-show').textContent=u.name;
+    document.getElementById('p-email-show').textContent=u.email;
+    document.getElementById('p-name').value=u.name||'';
+    document.getElementById('p-age').value=u.age||'';
+    document.getElementById('p-height').value=u.height_cm||'';
+    document.getElementById('p-weight').value=u.weight_kg||'';
+  }catch(e){console.error(e);}
+}
+async function saveProfile() {
+  try {
+    await api('PUT','/profile',{name:document.getElementById('p-name').value||null,age:parseInt(document.getElementById('p-age').value)||null,height_cm:parseFloat(document.getElementById('p-height').value)||null,weight_kg:parseFloat(document.getElementById('p-weight').value)||null});
+    toast('Profile updated!','ok');
+  }catch(e){toast(e.message,'err');}
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function icon(t){return{pushup:'💪',squat:'🏋️',vertical_jump:'🦘',jumping_jack:'⭐',situp:'🤸',lunge:'🚶'}[t]||'🏃';}
+function fmtEx(t){return{pushup:'Push-ups',squat:'Squats',vertical_jump:'Vertical Jump',jumping_jack:'Jumping Jacks',situp:'Sit-ups',lunge:'Lunges'}[t]||t;}
+function fmtDate(d){if(!d)return'—';return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+function sBar(s){const c=s>=80?'var(--green)':s>=60?'var(--amber)':'var(--red)';return`<div style="display:flex;align-items:center;gap:.5rem"><div class="prog-bar" style="width:65px"><div class="prog-fill" style="width:${s?.toFixed(0)||0}%;background:${c}"></div></div><span style="font-size:.75rem;color:var(--muted)">${s?.toFixed(0)||0}%</span></div>`;}
+function ringChart(s){const r=35,c=2*Math.PI*r,f=(s/100)*c,col=s>=80?'#10b981':s>=60?'#f59e0b':'#ef4444';return`<div class="score-ring"><svg width="90" height="90" viewBox="0 0 90 90"><circle cx="45" cy="45" r="${r}" fill="none" stroke="#162034" stroke-width="6"/><circle cx="45" cy="45" r="${r}" fill="none" stroke="${col}" stroke-width="6" stroke-dasharray="${f} ${c}" stroke-linecap="round"/></svg><div class="ring-label">${s?.toFixed(0)}<small>FORM</small></div></div>`;}
+function lCol(l){return{Advanced:'badge-green',Intermediate:'badge-cyan',Beginner:'badge-amber','Needs Work':'badge-red'}[l]||'badge-amber';}
+function gCol(g){return'AB'.includes(g)?'badge-green':g==='C'?'badge-amber':'badge-red';}
+function toast(msg,type='ok'){const el=document.createElement('div');el.className=`toast ${type}`;el.innerHTML=`${type==='ok'?'✅':'❌'} ${msg}`;document.getElementById('toast-c').appendChild(el);setTimeout(()=>el.remove(),4000);}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+</script>
+</body>
+</html>

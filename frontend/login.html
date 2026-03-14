@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AthleteAI — Sign In</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #04080f;
+    --surface: #080f1c;
+    --surface2: #0d1828;
+    --border: #162034;
+    --cyan: #00d4ff;
+    --purple: #8b5cf6;
+    --amber: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --text: #e8f0fe;
+    --muted: #5a7090;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Outfit', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* ── animated background ── */
+  .bg-orbs {
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  }
+  .orb {
+    position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.15;
+    animation: orbFloat 8s ease-in-out infinite;
+  }
+  .orb1 { width: 500px; height: 500px; background: var(--cyan); top: -100px; left: -100px; animation-delay: 0s; }
+  .orb2 { width: 400px; height: 400px; background: var(--purple); bottom: -100px; right: 20%; animation-delay: 3s; }
+  .orb3 { width: 300px; height: 300px; background: var(--amber); top: 50%; right: -50px; animation-delay: 6s; }
+  @keyframes orbFloat {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(20px, -30px) scale(1.1); }
+  }
+
+  /* grid overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px);
+    background-size: 50px 50px;
+    pointer-events: none; z-index: 0;
+  }
+
+  /* ── split layout ── */
+  .left-panel {
+    flex: 1;
+    display: flex; flex-direction: column; justify-content: center;
+    padding: 4rem;
+    position: relative; z-index: 1;
+  }
+
+  .right-panel {
+    width: 500px; min-height: 100vh;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    display: flex; flex-direction: column;
+    justify-content: center; padding: 3rem;
+    position: relative; z-index: 1;
+  }
+
+  /* ── branding ── */
+  .brand {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 5rem; line-height: 1;
+    letter-spacing: 2px;
+    background: linear-gradient(135deg, var(--cyan) 0%, var(--purple) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin-bottom: 1rem;
+  }
+  .brand-sub {
+    font-size: 1.1rem; color: var(--muted); font-weight: 300;
+    margin-bottom: 3rem; line-height: 1.6; max-width: 420px;
+  }
+
+  /* ── feature list ── */
+  .features { display: flex; flex-direction: column; gap: 1.25rem; }
+  .feature {
+    display: flex; align-items: center; gap: 1rem;
+    animation: fadeUp 0.6s ease both;
+  }
+  .feature:nth-child(1) { animation-delay: 0.1s; }
+  .feature:nth-child(2) { animation-delay: 0.2s; }
+  .feature:nth-child(3) { animation-delay: 0.3s; }
+  .feature:nth-child(4) { animation-delay: 0.4s; }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(20px); } }
+
+  .feature-icon {
+    width: 44px; height: 44px; border-radius: 10px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem;
+    background: rgba(0,212,255,0.08);
+    border: 1px solid rgba(0,212,255,0.2);
+  }
+  .feature-text { font-size: 0.9rem; color: var(--muted); }
+  .feature-text strong { color: var(--text); display: block; margin-bottom: 2px; }
+
+  /* ── role selector ── */
+  .role-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 1.5px;
+    margin-bottom: 0.75rem;
+  }
+  .role-selector {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 0.5rem; margin-bottom: 1.75rem;
+  }
+  .role-btn {
+    padding: 0.85rem 1rem;
+    border-radius: 10px; cursor: pointer;
+    border: 2px solid var(--border);
+    background: var(--surface2);
+    color: var(--muted);
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.875rem; font-weight: 500;
+    transition: all 0.25s;
+    display: flex; align-items: center; gap: 0.6rem;
+    position: relative; overflow: hidden;
+  }
+  .role-btn::before {
+    content: ''; position: absolute; inset: 0;
+    opacity: 0; transition: opacity 0.25s;
+  }
+  .role-btn.athlete::before { background: linear-gradient(135deg, rgba(0,212,255,0.08), transparent); }
+  .role-btn.admin::before   { background: linear-gradient(135deg, rgba(139,92,246,0.12), transparent); }
+
+  .role-btn:hover { border-color: var(--border); color: var(--text); }
+  .role-btn.athlete:hover { border-color: rgba(0,212,255,0.4); }
+  .role-btn.admin:hover   { border-color: rgba(139,92,246,0.4); }
+
+  .role-btn.selected.athlete {
+    border-color: var(--cyan); color: var(--cyan);
+    background: rgba(0,212,255,0.06);
+    box-shadow: 0 0 20px rgba(0,212,255,0.15);
+  }
+  .role-btn.selected.admin {
+    border-color: var(--purple); color: var(--purple);
+    background: rgba(139,92,246,0.08);
+    box-shadow: 0 0 20px rgba(139,92,246,0.2);
+  }
+  .role-btn.selected::before { opacity: 1; }
+
+  .role-icon { font-size: 1.2rem; }
+  .role-info { text-align: left; }
+  .role-info span { display: block; }
+  .role-info .role-name { font-weight: 600; font-size: 0.9rem; }
+  .role-info .role-desc { font-size: 0.72rem; opacity: 0.7; margin-top: 1px; }
+
+  /* indicator badge */
+  .role-indicator {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    padding: 0.3rem 0.8rem; border-radius: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem; font-weight: 500;
+    margin-bottom: 1.25rem;
+    transition: all 0.3s;
+  }
+  .role-indicator.athlete { background: rgba(0,212,255,0.1); color: var(--cyan); border: 1px solid rgba(0,212,255,0.3); }
+  .role-indicator.admin   { background: rgba(139,92,246,0.12); color: var(--purple); border: 1px solid rgba(139,92,246,0.35); }
+  .indicator-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+  /* ── form ── */
+  .form-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2rem; letter-spacing: 1px;
+    margin-bottom: 0.3rem;
+  }
+  .form-sub { font-size: 0.85rem; color: var(--muted); margin-bottom: 1.75rem; }
+
+  .form-group { margin-bottom: 1.1rem; }
+  .form-group label {
+    display: block; font-family: 'JetBrains Mono', monospace;
+    font-size: 0.68rem; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 0.4rem;
+  }
+  .form-group input {
+    width: 100%; background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-family: 'Outfit', sans-serif;
+    font-size: 0.9rem; padding: 0.75rem 1rem;
+    transition: all 0.2s;
+  }
+  .form-group input:focus {
+    outline: none; border-color: var(--cyan);
+    box-shadow: 0 0 0 3px rgba(0,212,255,0.1);
+  }
+  .form-group input.admin-focus:focus {
+    border-color: var(--purple);
+    box-shadow: 0 0 0 3px rgba(139,92,246,0.12);
+  }
+
+  .submit-btn {
+    width: 100%; padding: 0.875rem;
+    border-radius: 10px; border: none; cursor: pointer;
+    font-family: 'Outfit', sans-serif; font-size: 0.95rem; font-weight: 600;
+    transition: all 0.25s; margin-top: 0.5rem;
+    position: relative; overflow: hidden;
+  }
+  .submit-btn.athlete-btn {
+    background: linear-gradient(135deg, #00d4ff, #0096b3);
+    color: #000;
+  }
+  .submit-btn.admin-btn {
+    background: linear-gradient(135deg, #8b5cf6, #5b21b6);
+    color: #fff;
+  }
+  .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+  .submit-btn.athlete-btn:hover { box-shadow: 0 8px 24px rgba(0,212,255,0.3); }
+  .submit-btn.admin-btn:hover   { box-shadow: 0 8px 24px rgba(139,92,246,0.4); }
+
+  .form-footer {
+    text-align: center; margin-top: 1.25rem;
+    font-size: 0.85rem; color: var(--muted);
+  }
+  .form-footer a { color: var(--cyan); text-decoration: none; font-weight: 500; }
+  .form-footer a:hover { text-decoration: underline; }
+  .form-footer a.admin-link { color: var(--purple); }
+
+  .divider {
+    display: flex; align-items: center; gap: 0.75rem;
+    margin: 1rem 0; color: var(--muted); font-size: 0.75rem;
+  }
+  .divider::before, .divider::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+
+  .demo-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+  .demo-btn {
+    padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border);
+    background: transparent; color: var(--muted); cursor: pointer;
+    font-family: 'Outfit', sans-serif; font-size: 0.8rem; font-weight: 500;
+    transition: all 0.2s;
+  }
+  .demo-btn:hover { background: var(--surface2); color: var(--text); }
+  .demo-btn.athlete-demo:hover { border-color: rgba(0,212,255,0.4); color: var(--cyan); }
+  .demo-btn.admin-demo:hover   { border-color: rgba(139,92,246,0.4); color: var(--purple); }
+
+  .error-msg {
+    background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3);
+    border-radius: 8px; padding: 0.65rem 1rem;
+    font-size: 0.82rem; color: var(--red); margin-bottom: 1rem;
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+<div class="bg-orbs">
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="orb orb3"></div>
+</div>
+
+<!-- LEFT PANEL -->
+<div class="left-panel">
+  <div class="brand">AthleteAI</div>
+  <p class="brand-sub">AI-powered fitness evaluation platform. Upload your workout videos and get instant pose analysis, rep counting, and form scoring.</p>
+
+  <div class="features">
+    <div class="feature">
+      <div class="feature-icon">🤖</div>
+      <div class="feature-text"><strong>MediaPipe AI Analysis</strong>Real-time pose detection on every frame</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">📊</div>
+      <div class="feature-text"><strong>Form Scoring</strong>Instant feedback on movement quality</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">🛡️</div>
+      <div class="feature-text"><strong>Cheat Detection</strong>AI flags suspicious movement patterns</div>
+    </div>
+    <div class="feature">
+      <div class="feature-icon">📈</div>
+      <div class="feature-text"><strong>Progress Tracking</strong>Compare results over time with benchmarks</div>
+    </div>
+  </div>
+</div>
+
+<!-- RIGHT PANEL — LOGIN FORM -->
+<div class="right-panel">
+
+  <!-- ROLE INDICATOR -->
+  <div class="role-indicator athlete" id="role-indicator">
+    <span class="indicator-dot"></span>
+    <span id="indicator-text">ATHLETE ACCESS</span>
+  </div>
+
+  <div class="form-title" id="form-title">Welcome Back</div>
+  <p class="form-sub">Sign in to your account to continue</p>
+
+  <!-- ROLE SELECTOR -->
+  <div class="role-label">Sign in as</div>
+  <div class="role-selector">
+    <div class="role-btn athlete selected" onclick="selectRole('athlete')">
+      <span class="role-icon">🏃</span>
+      <div class="role-info">
+        <span class="role-name">Athlete</span>
+        <span class="role-desc">Upload & track tests</span>
+      </div>
+    </div>
+    <div class="role-btn admin" onclick="selectRole('admin')">
+      <span class="role-icon">⚡</span>
+      <div class="role-info">
+        <span class="role-name">Admin</span>
+        <span class="role-desc">Manage platform</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="error-msg" id="error-msg"></div>
+
+  <div class="form-group">
+    <label>Email Address</label>
+    <input type="email" id="email" placeholder="you@example.com" onkeydown="if(event.key==='Enter')handleLogin()">
+  </div>
+  <div class="form-group">
+    <label>Password</label>
+    <input type="password" id="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')handleLogin()">
+  </div>
+
+  <button class="submit-btn athlete-btn" id="submit-btn" onclick="handleLogin()">
+    Sign In as Athlete →
+  </button>
+
+  <div class="divider">or try a demo account</div>
+  <div class="demo-row">
+    <button class="demo-btn athlete-demo" onclick="demoLogin('athlete')">🏃 Athlete Demo</button>
+    <button class="demo-btn admin-demo"   onclick="demoLogin('admin')">⚡ Admin Demo</button>
+  </div>
+
+  <div class="form-footer" style="margin-top:1.5rem">
+    Don't have an account?
+    <a href="register.html" id="register-link">Create one here</a>
+  </div>
+
+</div>
+
+<script>
+const API = 'http://localhost:8000/api';
+let selectedRole = 'athlete';
+
+function selectRole(role) {
+  selectedRole = role;
+  // Update role buttons
+  document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelector('.role-btn.' + role).classList.add('selected');
+
+  // Update indicator
+  const ind = document.getElementById('role-indicator');
+  ind.className = 'role-indicator ' + role;
+  document.getElementById('indicator-text').textContent = role === 'admin' ? 'ADMIN ACCESS' : 'ATHLETE ACCESS';
+
+  // Update form title
+  document.getElementById('form-title').textContent = role === 'admin' ? 'Admin Portal' : 'Welcome Back';
+
+  // Update submit button
+  const btn = document.getElementById('submit-btn');
+  btn.className = 'submit-btn ' + (role === 'admin' ? 'admin-btn' : 'athlete-btn');
+  btn.textContent = role === 'admin' ? 'Sign In as Admin →' : 'Sign In as Athlete →';
+
+  // Update register link style
+  const link = document.getElementById('register-link');
+  link.className = role === 'admin' ? 'admin-link' : '';
+
+  // Update input focus color
+  document.querySelectorAll('input').forEach(i => {
+    i.className = role === 'admin' ? 'admin-focus' : '';
+  });
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = msg; el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 4000);
+}
+
+async function handleLogin() {
+  const email    = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  if (!email || !password) return showError('Please enter your email and password');
+
+  const btn = document.getElementById('submit-btn');
+  btn.textContent = 'Signing in...'; btn.disabled = true;
+
+  try {
+    const res = await fetch(`${API}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Invalid credentials');
+    }
+
+    const data = await res.json();
+    const role = data.user.role;
+
+    // Validate role matches selection
+    if (selectedRole === 'admin' && role !== 'admin') {
+      throw new Error('This account does not have admin access');
+    }
+    if (selectedRole === 'athlete' && role === 'admin') {
+      throw new Error('Please select "Admin" to sign in with this account');
+    }
+
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('user', JSON.stringify(data.user));
+
+    // Navigate to correct page
+    window.location.href = role === 'admin' ? 'admin.html' : 'athlete.html';
+
+  } catch (e) {
+    // Demo fallback if backend not running
+    if (e.message.includes('fetch') || e.message.includes('Failed') || e.message.includes('NetworkError')) {
+      demoLogin(selectedRole);
+      return;
+    }
+    showError(e.message);
+    btn.textContent = selectedRole === 'admin' ? 'Sign In as Admin →' : 'Sign In as Athlete →';
+    btn.disabled = false;
+  }
+}
+
+function demoLogin(role) {
+  const user = role === 'admin'
+    ? { id: 'admin-001', name: 'Admin User', email: 'admin@athleteai.com', role: 'admin' }
+    : { id: 'u-demo',   name: 'Demo Athlete', email: 'demo@athlete.com',   role: 'athlete' };
+  localStorage.setItem('token', 'demo-token-' + role);
+  localStorage.setItem('user', JSON.stringify(user));
+  window.location.href = role === 'admin' ? 'admin.html' : 'athlete.html';
+}
+
+// Restore previous session
+window.addEventListener('load', () => {
+  const user = JSON.parse(localStorage.getItem('user') || 'null');
+  if (user?.role) {
+    // Auto-redirect if already logged in
+    window.location.href = user.role === 'admin' ? 'admin.html' : 'athlete.html';
+  }
+});
+</script>
+</body>
+</html>
