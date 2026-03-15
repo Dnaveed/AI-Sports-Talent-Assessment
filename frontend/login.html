@@ -118,7 +118,7 @@
     margin-bottom: 0.75rem;
   }
   .role-selector {
-    display: grid; grid-template-columns: 1fr 1fr;
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
     gap: 0.5rem; margin-bottom: 1.75rem;
   }
   .role-btn {
@@ -137,17 +137,24 @@
     content: ''; position: absolute; inset: 0;
     opacity: 0; transition: opacity 0.25s;
   }
-  .role-btn.athlete::before { background: linear-gradient(135deg, rgba(0,212,255,0.08), transparent); }
-  .role-btn.admin::before   { background: linear-gradient(135deg, rgba(139,92,246,0.12), transparent); }
+  .role-btn.athlete::before   { background: linear-gradient(135deg, rgba(0,212,255,0.08), transparent); }
+  .role-btn.authority::before { background: linear-gradient(135deg, rgba(245,158,11,0.1), transparent); }
+  .role-btn.admin::before     { background: linear-gradient(135deg, rgba(139,92,246,0.12), transparent); }
 
   .role-btn:hover { border-color: var(--border); color: var(--text); }
-  .role-btn.athlete:hover { border-color: rgba(0,212,255,0.4); }
-  .role-btn.admin:hover   { border-color: rgba(139,92,246,0.4); }
+  .role-btn.athlete:hover   { border-color: rgba(0,212,255,0.4); }
+  .role-btn.authority:hover { border-color: rgba(245,158,11,0.4); }
+  .role-btn.admin:hover     { border-color: rgba(139,92,246,0.4); }
 
   .role-btn.selected.athlete {
     border-color: var(--cyan); color: var(--cyan);
     background: rgba(0,212,255,0.06);
     box-shadow: 0 0 20px rgba(0,212,255,0.15);
+  }
+  .role-btn.selected.authority {
+    border-color: var(--amber); color: var(--amber);
+    background: rgba(245,158,11,0.08);
+    box-shadow: 0 0 20px rgba(245,158,11,0.2);
   }
   .role-btn.selected.admin {
     border-color: var(--purple); color: var(--purple);
@@ -171,8 +178,9 @@
     margin-bottom: 1.25rem;
     transition: all 0.3s;
   }
-  .role-indicator.athlete { background: rgba(0,212,255,0.1); color: var(--cyan); border: 1px solid rgba(0,212,255,0.3); }
-  .role-indicator.admin   { background: rgba(139,92,246,0.12); color: var(--purple); border: 1px solid rgba(139,92,246,0.35); }
+  .role-indicator.athlete   { background: rgba(0,212,255,0.1); color: var(--cyan); border: 1px solid rgba(0,212,255,0.3); }
+  .role-indicator.authority { background: rgba(245,158,11,0.12); color: var(--amber); border: 1px solid rgba(245,158,11,0.35); }
+  .role-indicator.admin     { background: rgba(139,92,246,0.12); color: var(--purple); border: 1px solid rgba(139,92,246,0.35); }
   .indicator-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: pulse 2s infinite; }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
 
@@ -217,13 +225,18 @@
     background: linear-gradient(135deg, #00d4ff, #0096b3);
     color: #000;
   }
+  .submit-btn.authority-btn {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #000;
+  }
   .submit-btn.admin-btn {
     background: linear-gradient(135deg, #8b5cf6, #5b21b6);
     color: #fff;
   }
   .submit-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
-  .submit-btn.athlete-btn:hover { box-shadow: 0 8px 24px rgba(0,212,255,0.3); }
-  .submit-btn.admin-btn:hover   { box-shadow: 0 8px 24px rgba(139,92,246,0.4); }
+  .submit-btn.athlete-btn:hover   { box-shadow: 0 8px 24px rgba(0,212,255,0.3); }
+  .submit-btn.authority-btn:hover { box-shadow: 0 8px 24px rgba(245,158,11,0.4); }
+  .submit-btn.admin-btn:hover     { box-shadow: 0 8px 24px rgba(139,92,246,0.4); }
 
   .form-footer {
     text-align: center; margin-top: 1.25rem;
@@ -241,7 +254,7 @@
     content: ''; flex: 1; height: 1px; background: var(--border);
   }
 
-  .demo-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+  .demo-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.5rem; }
   .demo-btn {
     padding: 0.6rem; border-radius: 8px; border: 1px solid var(--border);
     background: transparent; color: var(--muted); cursor: pointer;
@@ -249,8 +262,9 @@
     transition: all 0.2s;
   }
   .demo-btn:hover { background: var(--surface2); color: var(--text); }
-  .demo-btn.athlete-demo:hover { border-color: rgba(0,212,255,0.4); color: var(--cyan); }
-  .demo-btn.admin-demo:hover   { border-color: rgba(139,92,246,0.4); color: var(--purple); }
+  .demo-btn.athlete-demo:hover   { border-color: rgba(0,212,255,0.4); color: var(--cyan); }
+  .demo-btn.authority-demo:hover { border-color: rgba(245,158,11,0.4); color: var(--amber); }
+  .demo-btn.admin-demo:hover     { border-color: rgba(139,92,246,0.4); color: var(--purple); }
 
   .error-msg {
     background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3);
@@ -315,6 +329,13 @@
         <span class="role-desc">Upload & track tests</span>
       </div>
     </div>
+    <div class="role-btn authority" onclick="selectRole('authority')">
+      <span class="role-icon">🏆</span>
+      <div class="role-info">
+        <span class="role-name">Sports Authority</span>
+        <span class="role-desc">Create assessments</span>
+      </div>
+    </div>
     <div class="role-btn admin" onclick="selectRole('admin')">
       <span class="role-icon">⚡</span>
       <div class="role-info">
@@ -342,7 +363,8 @@
   <div class="divider">or try a demo account</div>
   <div class="demo-row">
     <button class="demo-btn athlete-demo" onclick="demoLogin('athlete')">🏃 Athlete Demo</button>
-    <button class="demo-btn admin-demo"   onclick="demoLogin('admin')">⚡ Admin Demo</button>
+    <button class="demo-btn authority-demo" onclick="demoLogin('authority')">🏆 Authority Demo</button>
+    <button class="demo-btn admin-demo" onclick="demoLogin('admin')">⚡ Admin Demo</button>
   </div>
 
   <div class="form-footer" style="margin-top:1.5rem">
@@ -365,23 +387,35 @@ function selectRole(role) {
   // Update indicator
   const ind = document.getElementById('role-indicator');
   ind.className = 'role-indicator ' + role;
-  document.getElementById('indicator-text').textContent = role === 'admin' ? 'ADMIN ACCESS' : 'ATHLETE ACCESS';
+  const indicatorText = role === 'admin' ? 'ADMIN ACCESS'
+                      : role === 'authority' ? 'AUTHORITY ACCESS'
+                      : 'ATHLETE ACCESS';
+  document.getElementById('indicator-text').textContent = indicatorText;
 
   // Update form title
-  document.getElementById('form-title').textContent = role === 'admin' ? 'Admin Portal' : 'Welcome Back';
+  const formTitle = role === 'admin' ? 'Admin Portal'
+                  : role === 'authority' ? 'Authority Portal'
+                  : 'Welcome Back';
+  document.getElementById('form-title').textContent = formTitle;
 
   // Update submit button
   const btn = document.getElementById('submit-btn');
-  btn.className = 'submit-btn ' + (role === 'admin' ? 'admin-btn' : 'athlete-btn');
-  btn.textContent = role === 'admin' ? 'Sign In as Admin →' : 'Sign In as Athlete →';
+  const btnClass = role === 'admin' ? 'admin-btn'
+                 : role === 'authority' ? 'authority-btn'
+                 : 'athlete-btn';
+  btn.className = 'submit-btn ' + btnClass;
+  const btnText = role === 'admin' ? 'Sign In as Admin →'
+                : role === 'authority' ? 'Sign In as Authority →'
+                : 'Sign In as Athlete →';
+  btn.textContent = btnText;
 
   // Update register link style
   const link = document.getElementById('register-link');
-  link.className = role === 'admin' ? 'admin-link' : '';
+  link.className = (role === 'admin' || role === 'authority') ? 'admin-link' : '';
 
   // Update input focus color
   document.querySelectorAll('input').forEach(i => {
-    i.className = role === 'admin' ? 'admin-focus' : '';
+    i.className = (role === 'admin' || role === 'authority') ? 'admin-focus' : '';
   });
 }
 
@@ -418,15 +452,19 @@ async function handleLogin() {
     if (selectedRole === 'admin' && role !== 'admin') {
       throw new Error('This account does not have admin access');
     }
-    if (selectedRole === 'athlete' && role === 'admin') {
-      throw new Error('Please select "Admin" to sign in with this account');
+    if (selectedRole === 'authority' && role !== 'authority') {
+      throw new Error('This account does not have sports authority access');
+    }
+    if (selectedRole === 'athlete' && (role === 'admin' || role === 'authority')) {
+      const roleText = role === 'admin' ? 'Admin' : 'Sports Authority';
+      throw new Error(`Please select "${roleText}" to sign in with this account`);
     }
 
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(data.user));
 
     // Navigate to correct page
-    window.location.href = role === 'admin' ? 'admin.html' : 'athlete.html';
+    window.location.href = (role === 'admin' || role === 'authority') ? 'admin.html' : 'athlete.html';
 
   } catch (e) {
     // Demo fallback if backend not running
@@ -435,26 +473,33 @@ async function handleLogin() {
       return;
     }
     showError(e.message);
-    btn.textContent = selectedRole === 'admin' ? 'Sign In as Admin →' : 'Sign In as Athlete →';
+    const btnText = selectedRole === 'admin' ? 'Sign In as Admin →'
+                  : selectedRole === 'authority' ? 'Sign In as Authority →'
+                  : 'Sign In as Athlete →';
+    btn.textContent = btnText;
     btn.disabled = false;
   }
 }
 
 function demoLogin(role) {
+  const adminRoles = ['admin', 'authority'];
   const user = role === 'admin'
-    ? { id: 'admin-001', name: 'Admin User', email: 'admin@athleteai.com', role: 'admin' }
-    : { id: 'u-demo',   name: 'Demo Athlete', email: 'demo@athlete.com',   role: 'athlete' };
+    ? { id: 'admin-001', name: 'Admin User',    email: 'admin@athleteai.com',     role: 'admin' }
+    : role === 'authority'
+    ? { id: 'auth-001',  name: 'Sports Authority', email: 'authority@athleteai.com', role: 'authority' }
+    : { id: 'u-demo',    name: 'Demo Athlete',  email: 'demo@athlete.com',        role: 'athlete' };
   localStorage.setItem('token', 'demo-token-' + role);
   localStorage.setItem('user', JSON.stringify(user));
-  window.location.href = role === 'admin' ? 'admin.html' : 'athlete.html';
+  window.location.href = adminRoles.includes(role) ? 'admin.html' : 'athlete.html';
 }
 
 // Restore previous session
 window.addEventListener('load', () => {
+  const token = localStorage.getItem('token');
   const user = JSON.parse(localStorage.getItem('user') || 'null');
-  if (user?.role) {
+  if (token && user?.role) {
     // Auto-redirect if already logged in
-    window.location.href = user.role === 'admin' ? 'admin.html' : 'athlete.html';
+    window.location.href = (user.role === 'admin' || user.role === 'authority') ? 'admin.html' : 'athlete.html';
   }
 });
 </script>

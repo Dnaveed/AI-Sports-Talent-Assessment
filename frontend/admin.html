@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AthleteAI — Admin Dashboard</title>
+<title id="page-title">AthleteAI — Admin Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -21,6 +21,8 @@
   .nav-brand{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;background:linear-gradient(135deg,var(--purple),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:1px;}
   .nav-right{display:flex;align-items:center;gap:1rem;}
   .admin-badge{display:flex;align-items:center;gap:.4rem;padding:.3rem .875rem;border-radius:20px;background:rgba(139,92,246,.15);border:1px solid rgba(139,92,246,.4);color:var(--purple);font-family:'JetBrains Mono',monospace;font-size:.68rem;font-weight:500;}
+  .admin-badge.authority-badge{background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.4);color:var(--amber);}
+  .admin-badge.authority-badge .role-dot{background:var(--amber);}
   .role-dot{width:6px;height:6px;border-radius:50%;background:var(--purple);animation:pulse 2s infinite;}
   @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
   .nav-user{display:flex;align-items:center;gap:.75rem;color:var(--muted);font-size:.875rem;}
@@ -32,7 +34,7 @@
   .layout{display:grid;grid-template-columns:210px 1fr;min-height:calc(100vh - 53px);position:relative;z-index:1;}
   .sidebar{background:var(--surface);border-right:1px solid rgba(139,92,246,.15);padding:1.25rem 0;position:sticky;top:53px;height:calc(100vh - 53px);overflow-y:auto;}
   .sidebar-label{font-family:'JetBrains Mono',monospace;font-size:.6rem;color:rgba(139,92,246,.6);text-transform:uppercase;letter-spacing:1.5px;padding:.5rem .875rem;margin-bottom:.25rem;}
-  .sidebar-item{display:flex;align-items:center;gap:.75rem;padding:.6rem .875rem;margin:0 .5rem;border-radius:8px;color:var(--muted);cursor:pointer;transition:all .2s;font-size:.875rem;border:none;background:none;width:calc(100% - 1rem);text-align:left;}
+  .sidebar-item{display:flex;align-items:center;gap:.75rem;padding:.6rem .875rem;margin:0 .5rem;border-radius:8px;color:var(--muted);cursor:pointer;transition:all .2s;font-size:.875rem;font-family:'Outfit',sans-serif;border:none;background:none;width:calc(100% - 1rem);text-align:left;}
   .sidebar-item:hover{color:var(--text);background:rgba(139,92,246,.08);}
   .sidebar-item.active{color:var(--purple);background:rgba(139,92,246,.12);font-weight:500;}
   .content{padding:2rem;overflow-y:auto;}
@@ -103,6 +105,20 @@
   .toast{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.7rem 1rem;font-size:.85rem;min-width:260px;animation:tIn .3s ease;display:flex;align-items:center;gap:.5rem;}
   .toast.ok{border-color:var(--green);}.toast.err{border-color:var(--red);}
   @keyframes tIn{from{transform:translateX(80px);opacity:0;}}
+  .ct-ex-item{display:flex;align-items:center;gap:.5rem;background:var(--surface2);border:2px solid var(--border);border-radius:10px;padding:.75rem .875rem;cursor:pointer;font-size:.82rem;transition:all .2s;}
+  .ct-ex-item:hover{border-color:rgba(139,92,246,.3);}
+  .ct-ex-item input{accent-color:var(--purple);width:14px;height:14px;cursor:pointer;}
+  .ct-ex-item:has(input:checked){border-color:var(--purple);background:rgba(139,92,246,.07);}
+  .test-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem 1.5rem;margin-bottom:.875rem;transition:border-color .2s;}
+  .test-card:hover{border-color:rgba(139,92,246,.25);}
+  .status-select{background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.78rem;padding:.3rem .6rem;cursor:pointer;}
+  .shortlist-badge{display:inline-flex;align-items:center;gap:.35rem;padding:3px 10px;border-radius:20px;font-size:.68rem;font-family:'JetBrains Mono',monospace;font-weight:500;background:rgba(16,185,129,.1);color:var(--green);border:1px solid rgba(16,185,129,.25);cursor:pointer;transition:all .2s;}
+  .shortlist-badge:hover{background:rgba(16,185,129,.2);}
+  .shortlisted{background:rgba(16,185,129,.2);border-color:var(--green);}
+
+  /* ROLE-BASED VISIBILITY */
+  body.role-admin .authority-only { display: none !important; }
+  body.role-authority .admin-only { display: none !important; }
 </style>
 </head>
 <body>
@@ -111,7 +127,7 @@
 <nav>
   <div class="nav-brand">AthleteAI</div>
   <div class="nav-right">
-    <div class="admin-badge"><span class="role-dot"></span>ADMIN PANEL</div>
+    <div class="admin-badge" id="nav-role-badge"><span class="role-dot"></span>ADMIN PANEL</div>
     <div class="nav-user">
       <div class="avatar" id="nav-avatar">A</div>
       <span id="nav-name">Admin</span>
@@ -122,17 +138,25 @@
 
 <div class="layout">
   <aside class="sidebar">
-    <div class="sidebar-label">Administration</div>
-    <button class="sidebar-item active" id="sn-overview"  onclick="showSec('overview')">⚡ Overview</button>
-    <button class="sidebar-item" id="sn-athletes" onclick="showSec('athletes')">🏃 Athletes</button>
-    <button class="sidebar-item" id="sn-results"  onclick="showSec('results')">📋 All Results</button>
-    <button class="sidebar-item" id="sn-flags"    onclick="showSec('flags')">🚨 Cheat Flags</button>
+    <!-- ADMIN-ONLY SECTIONS -->
+    <div class="sidebar-label admin-only">System Management</div>
+    <button class="sidebar-item active admin-only" id="sn-overview" onclick="showSec('overview')">⚡ Overview</button>
+    <button class="sidebar-item admin-only" id="sn-athletes" onclick="showSec('athletes')">🏃 All Athletes</button>
+    <button class="sidebar-item admin-only" id="sn-authorities" onclick="showSec('authorities')">🏛️ All Authorities</button>
+    <button class="sidebar-item admin-only" id="sn-results" onclick="showSec('results')">📊 All Results</button>
+    <button class="sidebar-item admin-only" id="sn-flags" onclick="showSec('flags')">🚨 Cheat Flags</button>
+
+    <!-- AUTHORITY-ONLY SECTIONS -->
+    <div class="sidebar-label authority-only">Assessment Management</div>
+    <button class="sidebar-item active authority-only" id="sn-create-test" onclick="showSec('create-test')">📋 Create Test</button>
+    <button class="sidebar-item authority-only" id="sn-manage-tests" onclick="showSec('manage-tests')">🏆 Manage Tests</button>
+    <button class="sidebar-item authority-only" id="sn-leaderboard-admin" onclick="showSec('leaderboard-admin')">🥇 Leaderboard</button>
   </aside>
 
   <main class="content">
 
-    <!-- ── OVERVIEW ── -->
-    <section id="sec-overview">
+    <!-- ── OVERVIEW (ADMIN ONLY) ── -->
+    <section id="sec-overview" class="admin-only">
       <div class="admin-header">
         <span style="font-size:1.75rem">⚡</span>
         <div>
@@ -144,6 +168,7 @@
 
       <div class="stats-grid">
         <div class="card stat-card card-admin"><div class="stat-icon">👥</div><div class="stat-val" id="s-athletes">—</div><div class="stat-label">Total Athletes</div></div>
+        <div class="card stat-card card-admin"><div class="stat-icon">🏛️</div><div class="stat-val" id="s-authorities">—</div><div class="stat-label">Authorities</div></div>
         <div class="card stat-card card-admin"><div class="stat-icon">📹</div><div class="stat-val" id="s-sessions">—</div><div class="stat-label">Total Sessions</div></div>
         <div class="card stat-card card-admin"><div class="stat-icon">✅</div><div class="stat-val" id="s-completed">—</div><div class="stat-label">Completed</div></div>
         <div class="card stat-card card-admin"><div class="stat-icon">⭐</div><div class="stat-val" id="s-avgscore">—</div><div class="stat-label">Avg Form Score</div></div>
@@ -162,8 +187,88 @@
       </div>
     </section>
 
-    <!-- ── ATHLETES ── -->
-    <section id="sec-athletes" class="hidden">
+    <!-- ── CREATE TEST (AUTHORITY ONLY) ── -->
+    <section id="sec-create-test" class="hidden authority-only">
+      <div class="page-title">Create Assessment</div>
+      <p class="page-sub">Schedule a new physical fitness test for athletes</p>
+      <div style="display:grid;grid-template-columns:1fr 320px;gap:1.5rem;max-width:960px">
+        <div>
+          <div class="card" style="margin-bottom:1rem">
+            <div class="section-title" style="margin-bottom:1.25rem">Test Details</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.875rem;margin-bottom:.875rem">
+              <div><label style="font-family:'JetBrains Mono',monospace;font-size:.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:.35rem">Test Name *</label>
+                <input type="text" id="ct-name" placeholder="Football Fitness Trial" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.9rem;padding:.7rem 1rem" onfocus="this.style.borderColor='var(--purple)'" onblur="this.style.borderColor=''"></div>
+              <div><label style="font-family:'JetBrains Mono',monospace;font-size:.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:.35rem">Sport *</label>
+                <input type="text" id="ct-sport" placeholder="Football" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.9rem;padding:.7rem 1rem" onfocus="this.style.borderColor='var(--purple)'" onblur="this.style.borderColor=''"></div>
+            </div>
+            <div style="margin-bottom:.875rem"><label style="font-family:'JetBrains Mono',monospace;font-size:.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:.35rem">Description</label>
+              <textarea id="ct-desc" rows="2" placeholder="Brief description of the test..." style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.9rem;padding:.7rem 1rem;resize:vertical" onfocus="this.style.borderColor='var(--purple)'" onblur="this.style.borderColor=''"></textarea></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.875rem">
+              <div><label style="font-family:'JetBrains Mono',monospace;font-size:.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:.35rem">Date *</label>
+                <input type="date" id="ct-date" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.9rem;padding:.7rem 1rem" onfocus="this.style.borderColor='var(--purple)'" onblur="this.style.borderColor=''"></div>
+              <div><label style="font-family:'JetBrains Mono',monospace;font-size:.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:.35rem">Start Time *</label>
+                <input type="time" id="ct-time" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.9rem;padding:.7rem 1rem" onfocus="this.style.borderColor='var(--purple)'" onblur="this.style.borderColor=''"></div>
+              <div><label style="font-family:'JetBrains Mono',monospace;font-size:.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:.35rem">Duration (min)</label>
+                <input type="number" id="ct-duration" value="60" min="5" max="300" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.9rem;padding:.7rem 1rem" onfocus="this.style.borderColor='var(--purple)'" onblur="this.style.borderColor=''"></div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-bottom:1rem">
+            <div class="section-title" style="margin-bottom:.875rem">Exercises Included</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.625rem" id="ct-exercise-grid">
+              <label class="ct-ex-item" data-ex="pushup"><input type="checkbox" value="pushup"> 💪 Push-ups</label>
+              <label class="ct-ex-item" data-ex="situp"><input type="checkbox" value="situp"> 🤸 Sit-ups</label>
+              <label class="ct-ex-item" data-ex="squat"><input type="checkbox" value="squat"> 🏋️ Squats</label>
+              <label class="ct-ex-item" data-ex="vertical_jump"><input type="checkbox" value="vertical_jump"> 🦘 Vertical Jump</label>
+              <label class="ct-ex-item" data-ex="jumping_jack"><input type="checkbox" value="jumping_jack"> ⭐ Jumping Jacks</label>
+              <label class="ct-ex-item" data-ex="lunge"><input type="checkbox" value="lunge"> 🚶 Lunges</label>
+            </div>
+          </div>
+
+          <div id="ct-error" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:.65rem 1rem;font-size:.82rem;color:var(--red);margin-bottom:.875rem;display:none"></div>
+          <button class="btn btn-admin" onclick="submitCreateTest()" id="ct-submit-btn" style="width:100%;padding:1rem;font-size:1rem">📋 Publish Assessment →</button>
+        </div>
+        <div>
+          <div class="card" style="position:sticky;top:70px">
+            <div class="section-title" style="margin-bottom:.875rem">📋 Guidelines</div>
+            <div style="font-size:.8rem;color:var(--muted);line-height:1.7">
+              <div style="margin-bottom:.75rem">✅ Select at least one exercise for the test.</div>
+              <div style="margin-bottom:.75rem">✅ Athletes get notified on their dashboard after you publish.</div>
+              <div style="margin-bottom:.75rem">✅ Change status to <strong style="color:var(--green)">Active</strong> when the test starts.</div>
+              <div>✅ After all submissions, set to <strong style="color:var(--purple)">Completed</strong> to lock the leaderboard.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── MANAGE TESTS (AUTHORITY ONLY) ── -->
+    <section id="sec-manage-tests" class="hidden authority-only">
+      <div class="page-title">Manage Assessments</div>
+      <p class="page-sub">View and control all scheduled assessments</p>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem">
+        <div class="filter-row" style="margin:0">
+          <select id="mt-status-filter" onchange="loadManageTests()"><option value="">All</option><option value="upcoming">Upcoming</option><option value="active">Active</option><option value="completed">Completed</option></select>
+          <button class="btn btn-ghost btn-sm" onclick="loadManageTests()">🔄 Refresh</button>
+        </div>
+        <button class="btn btn-admin btn-sm" onclick="showSec('create-test')">+ Create New</button>
+      </div>
+      <div id="manage-tests-list"><div style="text-align:center;padding:3rem;color:var(--muted)">Loading...</div></div>
+    </section>
+
+    <!-- ── LEADERBOARD (AUTHORITY ONLY) ── -->
+    <section id="sec-leaderboard-admin" class="hidden authority-only">
+      <div class="page-title">Assessment Leaderboard</div>
+      <p class="page-sub">Rank athletes and shortlist for selection</p>
+      <div class="filter-row">
+        <select id="alb-test-select" onchange="loadAdminLeaderboard()" style="min-width:280px"><option value="">— Select an Assessment —</option></select>
+        <button class="btn btn-ghost btn-sm" onclick="loadAdminLeaderboard()">🔄 Refresh</button>
+      </div>
+      <div id="admin-leaderboard-body"><div style="text-align:center;padding:3rem;color:var(--muted)">Select an assessment to view rankings.</div></div>
+    </section>
+
+    <!-- ── ALL ATHLETES (ADMIN ONLY) ── -->
+    <section id="sec-athletes" class="hidden admin-only">
       <div class="page-title">All Athletes</div>
       <p class="page-sub">Registered athletes with performance stats</p>
       <div class="filter-row">
@@ -182,8 +287,24 @@
       </div>
     </section>
 
-    <!-- ── ALL RESULTS ── -->
-    <section id="sec-results" class="hidden">
+    <!-- ── ALL AUTHORITIES (ADMIN ONLY) ── -->
+    <section id="sec-authorities" class="hidden admin-only">
+      <div class="page-title">All Authorities</div>
+      <p class="page-sub">Registered sports authorities and organizations</p>
+      <div class="filter-row">
+        <input type="text" id="f-auth-search" placeholder="Search by name or email..." style="min-width:250px" onkeyup="filterAuthorities()">
+        <button class="btn btn-admin btn-sm" onclick="loadAuthorities()">🔄 Refresh</button>
+      </div>
+      <div class="card">
+        <table class="tbl">
+          <thead><tr><th>Name</th><th>Email</th><th>Joined</th><th>Tests Created</th><th>Total Participants</th><th>Status</th></tr></thead>
+          <tbody id="authorities-body"><tr><td colspan="6" style="text-align:center;color:var(--muted);padding:2rem">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── ALL RESULTS (ADMIN ONLY) ── -->
+    <section id="sec-results" class="hidden admin-only">
       <div class="page-title">All Test Results</div>
       <p class="page-sub">Every test submitted across the platform</p>
       <div class="filter-row">
@@ -201,8 +322,8 @@
       </div>
     </section>
 
-    <!-- ── CHEAT FLAGS ── -->
-    <section id="sec-flags" class="hidden">
+    <!-- ── CHEAT FLAGS (ADMIN ONLY) ── -->
+    <section id="sec-flags" class="hidden admin-only">
       <div class="page-title">🚨 Cheat Flags</div>
       <p class="page-sub">Tests flagged by AI for suspicious behaviour</p>
       <div id="flags-summary" style="margin-bottom:1.5rem"></div>
@@ -230,13 +351,30 @@ let allResults = null; // cache
 // ── Guard ─────────────────────────────────────────────────────────────────
 if (!token || !user) {
   window.location.href = 'login.html';
-} else if (user.role !== 'admin') {
+} else if (user.role !== 'admin' && user.role !== 'authority') {
   window.location.href = 'athlete.html';
 } else {
+  // Set body class based on role
+  document.body.className = `role-${user.role}`;
+
+  // Update page title based on role
+  document.getElementById('page-title').textContent =
+    user.role === 'authority' ? 'AthleteAI — Authority Portal' : 'AthleteAI — Admin Dashboard';
+
   const ini = user.name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
   document.getElementById('nav-avatar').textContent = ini;
   document.getElementById('nav-name').textContent   = user.name;
-  showSec('overview');
+  const badge = document.getElementById('nav-role-badge');
+  if (user.role === 'authority') {
+    badge.className = 'admin-badge authority-badge';
+    badge.innerHTML = `<span class="role-dot"></span>🏛️ AUTHORITY`;
+  } else {
+    badge.innerHTML = `<span class="role-dot"></span>⚡ ADMIN PANEL`;
+  }
+
+  // Show appropriate default section based on role
+  const defaultSection = user.role === 'authority' ? 'create-test' : 'overview';
+  showSec(defaultSection);
 }
 
 function logout() {
@@ -264,11 +402,17 @@ function demo(path) {
   if (path==='/admin/stats')   return mkStats();
   if (path==='/admin/results') return mkResults();
   if (path==='/admin/athletes') return mkAthletes();
+  if (path==='/admin/authorities') return mkAuthorities();
+  if (path==='/tests'||path.startsWith('/tests?')) return mkDemoTests();
+  if (path.includes('/leaderboard')) return mkDemoLeaderboard();
+  if (path.includes('/participants')) return [{user_id:'u1',name:'Alice Chen',email:'alice@demo.com',registered_at:new Date().toISOString()},{user_id:'u2',name:'Bob Kim',email:'bob@demo.com',registered_at:new Date().toISOString()}];
+  if (path.includes('/status')) return {success:true};
+  if (path.includes('/tests') && path.length > 8) return {test_id:'t-new',status:'upcoming'};
   return {};
 }
 function mkStats() {
   return {
-    total_athletes:47, total_sessions:312, completed_sessions:298,
+    total_athletes:47, total_authorities:6, total_sessions:312, completed_sessions:298,
     avg_correctness_score:76.4, cheat_flags:3,
     exercise_breakdown:[
       {exercise_type:'pushup',count:98},{exercise_type:'squat',count:87},
@@ -309,6 +453,28 @@ function mkAthletes() {
     last_test:new Date(Date.now()-i*86400000).toISOString()
   }));
 }
+function mkAuthorities() {
+  return [
+    {id:'auth1',name:'City Football Academy',email:'football@cityacademy.com',created_at:new Date('2026-01-15').toISOString(),tests_created:12,total_participants:248,status:'Active'},
+    {id:'auth2',name:'National Athletics Board',email:'info@nationalathletics.org',created_at:new Date('2026-02-01').toISOString(),tests_created:8,total_participants:156,status:'Active'},
+    {id:'auth3',name:'State Basketball League',email:'admin@basketballstate.com',created_at:new Date('2026-01-20').toISOString(),tests_created:15,total_participants:320,status:'Active'},
+    {id:'auth4',name:'Regional Cricket Club',email:'cricket@regional.com',created_at:new Date('2026-02-10').toISOString(),tests_created:5,total_participants:89,status:'Active'},
+    {id:'auth5',name:'Youth Sports Foundation',email:'contact@youthsports.org',created_at:new Date('2026-01-05').toISOString(),tests_created:20,total_participants:412,status:'Active'},
+    {id:'auth6',name:'Olympic Training Center',email:'admin@olympictraining.com',created_at:new Date('2025-12-20').toISOString(),tests_created:28,total_participants:567,status:'Active'},
+  ];
+}
+function mkDemoTests() {
+  return [
+    {id:'t1',name:'Football Fitness Test',sport:'Football',exercises:[{type:'pushup',weight:0.5},{type:'situp',weight:0.5}],scheduled_date:'2026-03-20',start_time:'10:00',duration_minutes:60,description:'Annual football selection test',status:'upcoming',participant_count:18,is_registered:false,created_by_name:'You'},
+    {id:'t2',name:'Athletics Selection Trial',sport:'Athletics',exercises:[{type:'vertical_jump',weight:0.6},{type:'squat',weight:0.4}],scheduled_date:'2026-03-15',start_time:'09:00',duration_minutes:90,description:'Sprint and jump assessments',status:'active',participant_count:31,is_registered:false,created_by_name:'You'},
+    {id:'t3',name:'Basketball Tryouts',sport:'Basketball',exercises:[{type:'jumping_jack',weight:0.5},{type:'lunge',weight:0.5}],scheduled_date:'2026-03-10',start_time:'14:00',duration_minutes:45,description:'City basketball league evaluation',status:'completed',participant_count:24,is_registered:false,created_by_name:'You'},
+  ];
+}
+function mkDemoLeaderboard() {
+  const names=['Rahul Singh','Ahmed Al-Farsi','Priya Patel','John Smith','Emma Watson','Carlos Diaz'];
+  const emails=['rahul@demo.com','ahmed@demo.com','priya@demo.com','john@demo.com','emma@demo.com','carlos@demo.com'];
+  return names.map((name,i)=>({rank:i+1,user_id:'u'+i,name,email:emails[i],score:94-i*4,form_grade:['A','A','B','B','C','C'][i],avg_correctness_score:91-i*3,total_reps:35-i*3,fitness_level:['Advanced','Advanced','Intermediate','Intermediate','Beginner','Beginner'][i],cheat_detected:i===4}));
+}
 
 // ── Navigation ─────────────────────────────────────────────────────────────
 function showSec(s) {
@@ -316,10 +482,13 @@ function showSec(s) {
   document.getElementById('sec-'+s)?.classList.remove('hidden');
   document.querySelectorAll('.sidebar-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('sn-'+s)?.classList.add('active');
-  if      (s==='overview')  loadOverview();
-  else if (s==='athletes')  loadAthletes();
-  else if (s==='results')   loadResults();
-  else if (s==='flags')     loadFlags();
+  if      (s==='overview')          loadOverview();
+  else if (s==='athletes')          loadAthletes();
+  else if (s==='authorities')       loadAuthorities();
+  else if (s==='results')           loadResults();
+  else if (s==='flags')             loadFlags();
+  else if (s==='manage-tests')      loadManageTests();
+  else if (s==='leaderboard-admin') { populateAdminTestSelect(); loadAdminLeaderboard(); }
 }
 
 // ── Overview ───────────────────────────────────────────────────────────────
@@ -328,11 +497,12 @@ async function loadOverview() {
     const s = await api('GET','/admin/stats');
     if (!s) return;
 
-    document.getElementById('s-athletes').textContent  = s.total_athletes;
-    document.getElementById('s-sessions').textContent  = s.total_sessions;
-    document.getElementById('s-completed').textContent = s.completed_sessions;
-    document.getElementById('s-avgscore').textContent  = s.avg_correctness_score + '%';
-    document.getElementById('s-cheats').textContent    = s.cheat_flags;
+    document.getElementById('s-athletes').textContent    = s.total_athletes;
+    document.getElementById('s-authorities').textContent = s.total_authorities || 0;
+    document.getElementById('s-sessions').textContent    = s.total_sessions;
+    document.getElementById('s-completed').textContent   = s.completed_sessions;
+    document.getElementById('s-avgscore').textContent    = s.avg_correctness_score + '%';
+    document.getElementById('s-cheats').textContent      = s.cheat_flags;
 
     // Exercise chart
     const ctx = document.getElementById('ex-chart').getContext('2d');
@@ -402,6 +572,63 @@ async function loadAthletes() {
 function clearFilters() {
   ['f-age-min','f-age-max','f-level','f-ex'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   loadAthletes();
+}
+
+// ── All Authorities ────────────────────────────────────────────────────────
+let cachedAuthorities = null;
+
+async function loadAuthorities() {
+  const tb = document.getElementById('authorities-body');
+  tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:2rem">Loading...</td></tr>';
+  try {
+    const authorities = await api('GET', '/admin/authorities');
+    cachedAuthorities = authorities;
+
+    if (!authorities?.length) {
+      tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:2rem">No authorities found</td></tr>';
+      return;
+    }
+
+    renderAuthorities(authorities);
+  } catch(e) {
+    tb.innerHTML = `<tr><td colspan="6" style="color:var(--red);text-align:center;padding:2rem">${e.message}</td></tr>`;
+  }
+}
+
+function renderAuthorities(authorities) {
+  const tb = document.getElementById('authorities-body');
+  tb.innerHTML = authorities.map(auth => `<tr>
+    <td><div style="font-weight:600">🏛️ ${auth.name}</div></td>
+    <td style="color:var(--muted);font-size:.82rem">${auth.email}</td>
+    <td style="color:var(--muted);font-size:.82rem">${fmtDate(auth.created_at)}</td>
+    <td><span class="badge badge-amber">${auth.tests_created || 0} tests</span></td>
+    <td><span class="badge badge-cyan">${auth.total_participants || 0} athletes</span></td>
+    <td><span class="badge badge-green">${auth.status || 'Active'}</span></td>
+  </tr>`).join('');
+}
+
+function filterAuthorities() {
+  if (!cachedAuthorities) return;
+
+  const searchTerm = document.getElementById('f-auth-search')?.value.toLowerCase().trim();
+
+  if (!searchTerm) {
+    renderAuthorities(cachedAuthorities);
+    return;
+  }
+
+  const filtered = cachedAuthorities.filter(auth =>
+    auth.name.toLowerCase().includes(searchTerm) ||
+    auth.email.toLowerCase().includes(searchTerm)
+  );
+
+  const tb = document.getElementById('authorities-body');
+  if (!filtered.length) {
+    tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:2rem">No authorities match your search</td></tr>';
+    return;
+  }
+
+  renderAuthorities(filtered);
 }
 
 // ── All Results ────────────────────────────────────────────────────────────
@@ -476,6 +703,181 @@ async function loadFlags() {
       <td style="font-size:.8rem;color:var(--red)">${(r.cheat_reasons||['No detail available']).map(reason=>`<div style="margin-bottom:3px">⚠️ ${reason}</div>`).join('')}</td>
     </tr>`).join('');
   } catch(e) { tb.innerHTML = `<tr><td colspan="7" style="color:var(--red);text-align:center;padding:2rem">${e.message}</td></tr>`; }
+}
+
+// ── Create Test ────────────────────────────────────────────────────────────
+async function submitCreateTest() {
+  const name     = document.getElementById('ct-name').value.trim();
+  const sport    = document.getElementById('ct-sport').value.trim();
+  const date     = document.getElementById('ct-date').value;
+  const time     = document.getElementById('ct-time').value;
+  const duration = parseInt(document.getElementById('ct-duration').value) || 60;
+  const desc     = document.getElementById('ct-desc').value.trim();
+  const errEl    = document.getElementById('ct-error');
+  errEl.style.display = 'none';
+
+  const checked = [...document.querySelectorAll('#ct-exercise-grid input:checked')].map(cb=>cb.value);
+  if (!name)           { errEl.textContent='Test name is required'; errEl.style.display='block'; return; }
+  if (!sport)          { errEl.textContent='Sport is required'; errEl.style.display='block'; return; }
+  if (!date)           { errEl.textContent='Date is required'; errEl.style.display='block'; return; }
+  if (!time)           { errEl.textContent='Start time is required'; errEl.style.display='block'; return; }
+  if (!checked.length) { errEl.textContent='Select at least one exercise'; errEl.style.display='block'; return; }
+
+  const totalWeight = 1 / checked.length;
+  const exercises = checked.map(t => ({ type: t, weight: Math.round(totalWeight * 100) / 100 }));
+
+  const btn = document.getElementById('ct-submit-btn');
+  btn.textContent = 'Publishing...'; btn.disabled = true;
+  try {
+    await api('POST', '/tests', { name, sport, exercises, scheduled_date: date, start_time: time, duration_minutes: duration, description: desc || null });
+    toast('Assessment published! Athletes have been notified.', 'ok');
+    // Reset form
+    ['ct-name','ct-sport','ct-desc'].forEach(id=>document.getElementById(id).value='');
+    document.querySelectorAll('#ct-exercise-grid input').forEach(cb=>cb.checked=false);
+    setTimeout(()=>showSec('manage-tests'), 800);
+  } catch(e) { errEl.textContent = e.message; errEl.style.display='block'; }
+  finally { btn.textContent='📋 Publish Assessment →'; btn.disabled=false; }
+}
+
+// ── Manage Tests ───────────────────────────────────────────────────────────
+async function loadManageTests() {
+  const container = document.getElementById('manage-tests-list');
+  container.innerHTML = '<div style="text-align:center;padding:3rem;color:var(--muted)">Loading...</div>';
+  try {
+    const statusFilter = document.getElementById('mt-status-filter').value;
+    const url = statusFilter ? `/tests?status=${statusFilter}` : '/tests';
+    const tests = await api('GET', url);
+    if (!tests?.length) { container.innerHTML='<div style="text-align:center;padding:3rem;color:var(--muted)">No assessments found. <a href="#" onclick="showSec(\'create-test\')" style="color:var(--purple)">Create one →</a></div>'; return; }
+    container.innerHTML = tests.map(t=>{
+      const statusColor = {upcoming:'var(--amber)',active:'var(--green)',completed:'var(--purple)'}[t.status]||'var(--muted)';
+      const exList = (t.exercises||[]).map(e=>fmtEx(e.type||e)).join(', ');
+      return `<div class="test-card">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem">
+          <div style="flex:1;min-width:220px">
+            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.35rem;flex-wrap:wrap">
+              <span style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:.5px">${t.name}</span>
+              <span class="badge badge-${t.status==='active'?'green':t.status==='completed'?'purple':'amber'}" style="font-size:.6rem">${t.status.toUpperCase()}</span>
+            </div>
+            <div style="font-size:.8rem;color:var(--muted);margin-bottom:.4rem">
+              <span style="margin-right:.75rem">🏅 ${t.sport||'—'}</span>
+              <span style="margin-right:.75rem">📅 ${t.scheduled_date} ${t.start_time}</span>
+              <span style="margin-right:.75rem">⏱ ${t.duration_minutes}min</span>
+              <span>👥 <strong style="color:var(--text)">${t.participant_count||0}</strong> registered</span>
+            </div>
+            <div style="font-size:.75rem;color:var(--muted)">Exercises: ${exList||'TBD'}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:.5rem;align-items:flex-end">
+            <div style="display:flex;align-items:center;gap:.5rem;font-size:.8rem">
+              <span style="color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:.62rem">STATUS:</span>
+              <select class="status-select" onchange="updateTestStatus('${t.id}',this.value)">
+                <option value="upcoming" ${t.status==='upcoming'?'selected':''}>Upcoming</option>
+                <option value="active"   ${t.status==='active'?'selected':''}>Active</option>
+                <option value="completed"${t.status==='completed'?'selected':''}>Completed</option>
+              </select>
+            </div>
+            <div style="display:flex;gap:.5rem">
+              <button class="btn btn-ghost btn-sm" onclick="loadTestParticipants('${t.id}','${t.name}')">👥 Participants</button>
+              <button class="btn btn-ghost btn-sm" onclick="goToLeaderboard('${t.id}')">🏆 Leaderboard</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { container.innerHTML=`<div style="text-align:center;padding:2rem;color:var(--red)">${e.message}</div>`; }
+}
+
+async function updateTestStatus(testId, status) {
+  try {
+    await api('PATCH', `/tests/${testId}/status?status=${status}`);
+    toast(`Status updated to ${status}`,'ok');
+  } catch(e) { toast(e.message,'err'); loadManageTests(); }
+}
+
+async function loadTestParticipants(testId, testName) {
+  try {
+    const participants = await api('GET', `/tests/${testId}/participants`);
+    if (!participants?.length) { toast(`No participants registered for "${testName}" yet`,'ok'); return; }
+    const names = participants.map(p=>`${p.name} (${p.email})`).join('\n');
+    alert(`Participants for "${testName}" (${participants.length}):\n\n${names}`);
+  } catch(e) { toast(e.message,'err'); }
+}
+
+function goToLeaderboard(testId) {
+  showSec('leaderboard-admin');
+  setTimeout(()=>{ document.getElementById('alb-test-select').value=testId; loadAdminLeaderboard(); }, 100);
+}
+
+// ── Admin Leaderboard ──────────────────────────────────────────────────────
+async function populateAdminTestSelect() {
+  try {
+    const tests = await api('GET', '/tests');
+    const sel = document.getElementById('alb-test-select');
+    const current = sel.value;
+    sel.innerHTML = '<option value="">— Select an Assessment —</option>';
+    (tests||[]).forEach(t=>{
+      const opt=document.createElement('option');
+      opt.value=t.id; opt.textContent=`${t.name} (${t.sport||'General'}) — ${t.status}`;
+      sel.appendChild(opt);
+    });
+    if (current) sel.value = current;
+  } catch(e) { console.error(e); }
+}
+
+async function loadAdminLeaderboard() {
+  const testId = document.getElementById('alb-test-select').value;
+  const body = document.getElementById('admin-leaderboard-body');
+  if (!testId) { body.innerHTML='<div style="text-align:center;padding:3rem;color:var(--muted)">Select an assessment to view rankings.</div>'; return; }
+  body.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted)">Loading...</div>';
+  try {
+    const entries = await api('GET', `/tests/${testId}/leaderboard`);
+    if (!entries?.length) { body.innerHTML='<div class="card" style="text-align:center;padding:2rem;color:var(--muted)">No results submitted yet for this assessment.</div>'; return; }
+    let shortlisted = new Set(JSON.parse(localStorage.getItem('shortlisted_'+testId)||'[]'));
+    const renderTable = () => {
+      body.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+          <div style="font-size:.85rem;color:var(--muted)">${entries.length} athlete${entries.length>1?'s':''} · ${shortlisted.size} shortlisted</div>
+          <button class="btn btn-ghost btn-sm" onclick="exportShortlist('${testId}')">📥 Export Shortlist</button>
+        </div>
+        <div class="card"><table class="tbl">
+        <thead><tr><th>Rank</th><th>Athlete</th><th>Score</th><th>Grade</th><th>Reps</th><th>Form</th><th>Level</th><th>Status</th><th>Shortlist</th></tr></thead>
+        <tbody>${entries.map(e=>{
+          const medal=e.rank===1?'🥇':e.rank===2?'🥈':e.rank===3?'🥉':'';
+          const isSL = shortlisted.has(e.user_id);
+          return `<tr>
+            <td><strong style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem">${medal}${e.rank}</strong></td>
+            <td><div style="font-weight:600">${e.name}</div><div style="font-size:.72rem;color:var(--muted)">${e.email||''}</div></td>
+            <td><strong style="font-family:'Bebas Neue',sans-serif;font-size:1.25rem;color:var(--purple)">${e.score}</strong><span style="font-size:.7rem;color:var(--muted)">/100</span></td>
+            <td><span class="badge ${gCol(e.form_grade)}">${e.form_grade||'—'}</span></td>
+            <td>${e.total_reps||'—'}</td>
+            <td>${sBar(e.avg_correctness_score)}</td>
+            <td><span class="badge ${lCol(e.fitness_level)}">${e.fitness_level||'—'}</span></td>
+            <td>${e.cheat_detected?'<span class="badge badge-red">⚠️ Flagged</span>':'<span class="badge badge-green">✓ Clean</span>'}</td>
+            <td><span class="shortlist-badge ${isSL?'shortlisted':''}" onclick="toggleShortlist('${testId}','${e.user_id}',this)">${isSL?'★ Shortlisted':'☆ Shortlist'}</span></td>
+          </tr>`;
+        }).join('')}</tbody></table></div>`;
+    };
+    renderTable();
+    window._lbEntries = entries;
+    window._lbTestId  = testId;
+  } catch(e) { body.innerHTML=`<div style="text-align:center;padding:2rem;color:var(--red)">${e.message}</div>`; }
+}
+
+function toggleShortlist(testId, userId, el) {
+  let sl = new Set(JSON.parse(localStorage.getItem('shortlisted_'+testId)||'[]'));
+  if (sl.has(userId)) { sl.delete(userId); el.classList.remove('shortlisted'); el.textContent='☆ Shortlist'; }
+  else                { sl.add(userId);    el.classList.add('shortlisted');    el.textContent='★ Shortlisted'; }
+  localStorage.setItem('shortlisted_'+testId, JSON.stringify([...sl]));
+}
+
+function exportShortlist(testId) {
+  const sl = new Set(JSON.parse(localStorage.getItem('shortlisted_'+testId)||'[]'));
+  const entries = (window._lbEntries||[]).filter(e=>sl.has(e.user_id));
+  if (!entries.length) { toast('No athletes shortlisted yet','err'); return; }
+  const csv = 'Rank,Name,Email,Score,Grade,Level\n' + entries.map(e=>`${e.rank},"${e.name}","${e.email||''}",${e.score},${e.form_grade||''},${e.fitness_level||''}`).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = `shortlist_${testId}.csv`; a.click();
+  toast(`Exported ${entries.length} shortlisted athletes`,'ok');
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────

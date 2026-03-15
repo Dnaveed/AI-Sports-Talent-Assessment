@@ -31,7 +31,7 @@
   .layout{display:grid;grid-template-columns:200px 1fr;min-height:calc(100vh - 53px);position:relative;z-index:1;}
   .sidebar{background:var(--surface);border-right:1px solid var(--border);padding:1.25rem 0;position:sticky;top:53px;height:calc(100vh - 53px);overflow-y:auto;}
   .sidebar-label{font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;padding:.5rem .875rem;margin-bottom:.25rem;}
-  .sidebar-item{display:flex;align-items:center;gap:.75rem;padding:.6rem .875rem;margin:0 .5rem;border-radius:8px;color:var(--muted);cursor:pointer;transition:all .2s;font-size:.875rem;border:none;background:none;width:calc(100% - 1rem);text-align:left;}
+  .sidebar-item{display:flex;align-items:center;gap:.75rem;padding:.6rem .875rem;margin:0 .5rem;border-radius:8px;color:var(--muted);cursor:pointer;transition:all .2s;font-size:.875rem;font-family:'Outfit',sans-serif;border:none;background:none;width:calc(100% - 1rem);text-align:left;}
   .sidebar-item:hover{color:var(--text);background:var(--surface2);}
   .sidebar-item.active{color:var(--cyan);background:rgba(0,212,255,.08);font-weight:500;}
   .content{padding:2rem;overflow-y:auto;}
@@ -151,8 +151,10 @@
   <aside class="sidebar">
     <div class="sidebar-label">Menu</div>
     <button class="sidebar-item active" id="sn-dashboard" onclick="showSec('dashboard')">📊 Dashboard</button>
+    <button class="sidebar-item" id="sn-tests"     onclick="showSec('tests')">🏆 Assessments</button>
     <button class="sidebar-item" id="sn-upload"    onclick="showSec('upload')">📤 New Test</button>
     <button class="sidebar-item" id="sn-history"   onclick="showSec('history')">📋 My Results</button>
+    <button class="sidebar-item" id="sn-leaderboard" onclick="showSec('leaderboard')">🥇 Leaderboard</button>
     <button class="sidebar-item" id="sn-profile"   onclick="showSec('profile')">👤 Profile</button>
   </aside>
 
@@ -247,6 +249,35 @@
       </div>
     </section>
 
+    <!-- ASSESSMENTS / TESTS -->
+    <section id="sec-tests" class="hidden">
+      <div class="page-title">Assessments</div>
+      <p class="page-sub">Scheduled fitness tests from sports authorities</p>
+      <div class="filter-row">
+        <select id="t-status-filter" onchange="loadTests()">
+          <option value="">All Tests</option>
+          <option value="upcoming">Upcoming</option>
+          <option value="active">Active Now</option>
+          <option value="completed">Completed</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="loadTests()">🔄 Refresh</button>
+      </div>
+      <div id="tests-list"><div style="text-align:center;padding:3rem;color:var(--muted)">Loading assessments...</div></div>
+    </section>
+
+    <!-- LEADERBOARD -->
+    <section id="sec-leaderboard" class="hidden">
+      <div class="page-title">Leaderboard</div>
+      <p class="page-sub">Athlete rankings for each assessment</p>
+      <div class="filter-row">
+        <select id="lb-test-select" onchange="loadLeaderboard()" style="min-width:260px">
+          <option value="">— Select an Assessment —</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="loadLeaderboard()">🔄 Refresh</button>
+      </div>
+      <div id="leaderboard-body"><div style="text-align:center;padding:3rem;color:var(--muted)">Select an assessment above to view rankings.</div></div>
+    </section>
+
     <!-- RESULT DETAIL -->
     <section id="sec-result" class="hidden">
       <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem">
@@ -302,7 +333,7 @@ let selectedEx = 'pushup', selectedFile = null, charts = {};
 
 // Guard — redirect if not logged in or wrong role
 if (!token || !user) { window.location.href = 'login.html'; }
-else if (user.role === 'admin') { window.location.href = 'admin.html'; }
+else if (user.role === 'admin' || user.role === 'authority') { window.location.href = 'admin.html'; }
 else {
   document.getElementById('nav-avatar').textContent = user.name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
   document.getElementById('nav-name').textContent = user.name;
@@ -337,7 +368,27 @@ function demoFallback(method, path, body) {
   if (path.includes('/results/')) return mkDetail();
   if (path==='/auth/me') return user;
   if (path==='/profile') return {success:true};
+  if (path==='/tests') return mkDemoTests();
+  if (path.includes('/register') && method==='POST') return {success:true};
+  if (path.includes('/register') && method==='DELETE') return {success:true};
+  if (path.includes('/leaderboard')) return mkDemoLeaderboard();
   return {};
+}
+function mkDemoTests() {
+  const exSets = [
+    [{type:'pushup',weight:0.5},{type:'situp',weight:0.5}],
+    [{type:'vertical_jump',weight:0.6},{type:'squat',weight:0.4}],
+    [{type:'jumping_jack',weight:0.4},{type:'lunge',weight:0.6}],
+  ];
+  return [
+    {id:'t1',name:'Football Fitness Test',sport:'Football',exercises:exSets[0],scheduled_date:'2026-03-20',start_time:'10:00',duration_minutes:60,description:'Annual football club selection test',status:'upcoming',participant_count:18,is_registered:false,created_by_name:'FC Academy'},
+    {id:'t2',name:'Athletics Selection Trial',sport:'Athletics',exercises:exSets[1],scheduled_date:'2026-03-15',start_time:'09:00',duration_minutes:90,description:'Sprint and jump assessments for track team',status:'active',participant_count:31,is_registered:true,created_by_name:'National Athletics Board'},
+    {id:'t3',name:'Basketball Tryouts',sport:'Basketball',exercises:exSets[2],scheduled_date:'2026-03-10',start_time:'14:00',duration_minutes:45,description:'City basketball league evaluation',status:'completed',participant_count:24,is_registered:false,created_by_name:'City Sports Club'},
+  ];
+}
+function mkDemoLeaderboard() {
+  const names=['Rahul Singh','Ahmed Al-Farsi','Priya Patel','John Smith','Emma Watson','Carlos Diaz'];
+  return names.map((name,i)=>({rank:i+1,user_id:'u'+i,name,score:94-i*4,form_grade:['A','A','B','B','C','C'][i],avg_correctness_score:91-i*3,total_reps:35-i*3,fitness_level:['Advanced','Advanced','Intermediate','Intermediate','Beginner','Beginner'][i],cheat_detected:false}));
 }
 function mkResults() {
   const ex=['pushup','squat','vertical_jump','jumping_jack'], lv=['Beginner','Intermediate','Advanced'], gr=['A','B','C'];
@@ -369,6 +420,8 @@ function showSec(s) {
   if(s==='dashboard') loadDashboard();
   else if(s==='history') loadHistory();
   else if(s==='profile') loadProfile();
+  else if(s==='tests') loadTests();
+  else if(s==='leaderboard') { populateTestSelect(); loadLeaderboard(); }
 }
 
 // ── Dashboard ──────────────────────────────────────────────────────────────
@@ -449,7 +502,9 @@ async function submitVideo() {
   const pit=setInterval(()=>{ p=Math.min(p+Math.random()*7,90); pf.style.width=p+'%'; },500);
   try {
     const form=new FormData(); form.append('file',selectedFile);
-    const sess=await api('POST',`/sessions/upload?exercise_type=${selectedEx}`,form,true);
+    const testId = document.getElementById('submit-btn').dataset.testId || '';
+    const queryParams = `exercise_type=${selectedEx}${testId?`&test_id=${testId}`:''}`;
+    const sess=await api('POST',`/sessions/upload?${queryParams}`,form,true);
     if (!sess) throw new Error('Upload failed');
     let tries=0;
     while(tries<30) {
@@ -464,6 +519,7 @@ async function submitVideo() {
     const result=await api('GET',`/sessions/${sess.session_id}/result`);
     if(result) showResult(result);
     toast('Analysis complete! 🎉','ok');
+    if (testId) { delete document.getElementById('submit-btn').dataset.testId; }
   } catch(e){ clearInterval(sit); clearInterval(pit); ol.classList.add('hidden'); toast(e.message,'err'); }
 }
 
@@ -559,6 +615,129 @@ async function saveProfile() {
     await api('PUT','/profile',{name:document.getElementById('p-name').value||null,age:parseInt(document.getElementById('p-age').value)||null,height_cm:parseFloat(document.getElementById('p-height').value)||null,weight_kg:parseFloat(document.getElementById('p-weight').value)||null});
     toast('Profile updated!','ok');
   }catch(e){toast(e.message,'err');}
+}
+
+// ── Assessments ────────────────────────────────────────────────────────────
+async function loadTests() {
+  const container = document.getElementById('tests-list');
+  container.innerHTML = '<div style="text-align:center;padding:3rem;color:var(--muted)">Loading...</div>';
+  try {
+    const statusFilter = document.getElementById('t-status-filter').value;
+    const url = statusFilter ? `/tests?status=${statusFilter}` : '/tests';
+    const tests = await api('GET', url);
+    if (!tests?.length) {
+      container.innerHTML = '<div style="text-align:center;padding:3rem;color:var(--muted)">No assessments found.</div>';
+      return;
+    }
+    container.innerHTML = tests.map(t => {
+      const statusBadge = {upcoming:'badge-amber',active:'badge-green',completed:'badge-purple'}[t.status] || 'badge-cyan';
+      const exList = (t.exercises||[]).map(e=>fmtEx(e.type||e)).join(', ');
+      const isActive = t.status==='active';
+      const isUpcoming = t.status==='upcoming';
+      const isDone = t.status==='completed';
+      return `<div class="card" style="margin-bottom:1rem;border-color:${isActive?'rgba(16,185,129,.3)':''}" >
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:.75rem">
+          <div style="flex:1;min-width:200px">
+            <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.35rem">
+              <span style="font-family:'Bebas Neue',sans-serif;font-size:1.15rem;letter-spacing:.5px">${t.name}</span>
+              <span class="badge ${statusBadge}" style="font-size:.6rem">${t.status.toUpperCase()}</span>
+              ${t.is_registered?'<span class="badge badge-cyan" style="font-size:.6rem">✓ REGISTERED</span>':''}
+            </div>
+            <div style="font-size:.8rem;color:var(--muted);margin-bottom:.6rem">
+              <span style="margin-right:.75rem">🏅 ${t.sport||'General'}</span>
+              <span style="margin-right:.75rem">📅 ${t.scheduled_date} at ${t.start_time}</span>
+              <span style="margin-right:.75rem">⏱ ${t.duration_minutes} min</span>
+              <span>👥 ${t.participant_count||0} participants</span>
+            </div>
+            ${t.description?`<div style="font-size:.8rem;color:var(--muted);margin-bottom:.6rem">${t.description}</div>`:''}
+            <div style="font-size:.75rem;color:var(--muted)">
+              <span style="font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.5px;font-size:.62rem">Exercises:</span>
+              <span style="margin-left:.35rem">${exList||'TBD'}</span>
+            </div>
+            ${t.created_by_name?`<div style="font-size:.72rem;color:var(--muted);margin-top:.25rem">By: ${t.created_by_name}</div>`:''}
+          </div>
+          <div style="display:flex;flex-direction:column;gap:.5rem;min-width:140px;align-items:flex-end">
+            ${isActive?`<button class="btn btn-primary btn-sm" onclick="joinTest('${t.id}','${(t.exercises||[{}])[0]?.type||'pushup'}')">🎥 Join & Record</button>`:''}
+            ${isUpcoming && !t.is_registered?`<button class="btn btn-ghost btn-sm" onclick="registerForTest('${t.id}',this)">📝 Register</button>`:''}
+            ${isUpcoming && t.is_registered?`<button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:var(--red)" onclick="unregisterFromTest('${t.id}',this)">✕ Unregister</button>`:''}
+            ${isDone?`<button class="btn btn-ghost btn-sm" onclick="document.getElementById('lb-test-select').value='${t.id}';showSec('leaderboard')">🏆 View Results</button>`:''}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    container.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--red)">${e.message}</div>`;
+  }
+}
+
+async function registerForTest(testId, btn) {
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    await api('POST', `/tests/${testId}/register`);
+    toast('Registered for assessment! ✅','ok'); loadTests();
+  } catch(e) { toast(e.message,'err'); btn.disabled=false; btn.textContent='📝 Register'; }
+}
+
+async function unregisterFromTest(testId, btn) {
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    await api('DELETE', `/tests/${testId}/register`);
+    toast('Unregistered.','ok'); loadTests();
+  } catch(e) { toast(e.message,'err'); btn.disabled=false; btn.textContent='✕ Unregister'; }
+}
+
+function joinTest(testId, exerciseType) {
+  showSec('upload');
+  // Pre-select the exercise matching the test
+  document.querySelectorAll('.ex-btn').forEach(b=>b.classList.remove('selected'));
+  const target = document.querySelector(`[data-ex="${exerciseType}"]`);
+  if (target) { target.classList.add('selected'); selectedEx = exerciseType; }
+  document.getElementById('submit-btn').dataset.testId = testId;
+  toast(`Recording for assessment — exercise: ${fmtEx(exerciseType)}`,'ok');
+}
+
+// ── Leaderboard ─────────────────────────────────────────────────────────────
+async function populateTestSelect() {
+  try {
+    const tests = await api('GET', '/tests');
+    const sel = document.getElementById('lb-test-select');
+    const current = sel.value;
+    sel.innerHTML = '<option value="">— Select an Assessment —</option>';
+    (tests||[]).forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.id; opt.textContent = `${t.name} (${t.sport||'General'}) — ${t.status}`;
+      sel.appendChild(opt);
+    });
+    if (current) sel.value = current;
+  } catch(e) { console.error(e); }
+}
+
+async function loadLeaderboard() {
+  const testId = document.getElementById('lb-test-select').value;
+  const body = document.getElementById('leaderboard-body');
+  if (!testId) { body.innerHTML = '<div style="text-align:center;padding:3rem;color:var(--muted)">Select an assessment above to view rankings.</div>'; return; }
+  body.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted)">Loading...</div>';
+  try {
+    const entries = await api('GET', `/tests/${testId}/leaderboard`);
+    if (!entries?.length) { body.innerHTML = '<div class="card" style="text-align:center;padding:2rem;color:var(--muted)">No results submitted yet.</div>'; return; }
+    const myId = user?.id;
+    body.innerHTML = `<div class="card"><table class="tbl">
+      <thead><tr><th>Rank</th><th>Athlete</th><th>Score</th><th>Grade</th><th>Reps</th><th>Form</th><th>Level</th><th>Status</th></tr></thead>
+      <tbody>${entries.map(e=>{
+        const isMe = e.user_id===myId;
+        const medal = e.rank===1?'🥇':e.rank===2?'🥈':e.rank===3?'🥉':'';
+        return `<tr style="${isMe?'background:rgba(0,212,255,.05);':''}">
+          <td><strong style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem">${medal}${e.rank}</strong></td>
+          <td><div style="font-weight:600">${e.name}${isMe?' <span class="badge badge-cyan" style="font-size:.58rem">YOU</span>':''}</div></td>
+          <td><strong style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;color:var(--cyan)">${e.score}</strong><span style="font-size:.7rem;color:var(--muted)">/100</span></td>
+          <td><span class="badge ${gCol(e.form_grade)}">${e.form_grade||'—'}</span></td>
+          <td>${e.total_reps||'—'}</td>
+          <td>${sBar(e.avg_correctness_score)}</td>
+          <td><span class="badge ${lCol(e.fitness_level)}">${e.fitness_level||'—'}</span></td>
+          <td>${e.cheat_detected?'<span class="badge badge-red">⚠️ Flagged</span>':'<span class="badge badge-green">✓ Clean</span>'}</td>
+        </tr>`;
+      }).join('')}</tbody></table></div>`;
+  } catch(e) { body.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--red)">${e.message}</div>`; }
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────

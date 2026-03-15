@@ -3,9 +3,9 @@ AthleteAI Backend - FastAPI + MongoDB (Motor async driver)
 Replaces SQLite with MongoDB for all data storage.
 Connect MongoDB Compass to: mongodb://localhost:27017
 Database: athleteai
-Collections: users, test_sessions, processing_jobs, analysis_results
+Collections: users, test_sessions,processing_jobs, analysis_results
 """
-
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,12 +16,6 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from motor.motor_asyncio import AsyncIOMotorClient
 
-
-app = FastAPI(title="AthleteAI API", version="2.0.0")
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True,
-                   allow_methods=["*"], allow_headers=["*"])
-security = HTTPBearer()
-
 UPLOAD_DIR = Path("./uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 SECRET_KEY = os.environ.get("SECRET_KEY", "athleteai-secret-key-change-in-production")
@@ -31,8 +25,8 @@ MONGO_DB   = os.environ.get("MONGO_DB", "athleteai")
 client = db = None
 
 
-@app.on_event("startup")
-async def startup_db():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     global client, db
     client = AsyncIOMotorClient(MONGO_URI)
     db = client[MONGO_DB]
@@ -43,6 +37,10 @@ async def startup_db():
     await db.analysis_results.create_index("session_id")
     await db.analysis_results.create_index([("exercise_type", 1), ("fitness_level", 1)])
     await db.analysis_results.create_index("created_at")
+    await db.tests.create_index("status")
+    await db.tests.create_index("created_by")
+    await db.test_registrations.create_index([("test_id", 1), ("user_id", 1)], unique=True)
+    await db.test_registrations.create_index("user_id")
     if not await db.users.find_one({"email": "admin@athleteai.com"}):
         await db.users.insert_one({
             "_id": "admin-001", "email": "admin@athleteai.com",
@@ -52,11 +50,14 @@ async def startup_db():
         })
     print(f"✅  MongoDB connected → {MONGO_URI}/{MONGO_DB}")
     print(f"📡  Open Compass and connect to: {MONGO_URI}")
-
-
-@app.on_event("shutdown")
-async def shutdown_db():
+    yield
     client.close()
+
+
+app = FastAPI(title="AthleteAI API", version="2.0.0", lifespan=lifespan)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True,
+                   allow_methods=["*"], allow_headers=["*"])
+security = HTTPBearer()
 
 
 # ── Serialization ──────────────────────────────────────────────────────────────
@@ -114,6 +115,7 @@ async def require_admin(user=Depends(get_current_user)):
 
 class RegisterRequest(BaseModel):
     email: str; name: str; password: str
+    role: Optional[str] = "athlete"
     age: Optional[int] = None
     weight_kg: Optional[float] = None
     height_cm: Optional[float] = None
@@ -133,17 +135,18 @@ class UpdateProfileRequest(BaseModel):
 @app.post("/api/auth/register")
 async def register(req: RegisterRequest):
     uid = str(uuid.uuid4())
+    role = req.role if req.role in ("athlete", "authority") else "athlete"
     try:
         await db.users.insert_one({
             "_id": uid, "email": req.email, "name": req.name,
-            "password_hash": hash_password(req.password), "role": "athlete",
+            "password_hash": hash_password(req.password), "role": role,
             "age": req.age, "weight_kg": req.weight_kg, "height_cm": req.height_cm,
             "created_at": datetime.utcnow(), "last_login": None,
         })
     except Exception:
         raise HTTPException(409, "Email already registered")
-    return {"token": create_token(uid, "athlete"),
-            "user": {"id": uid, "email": req.email, "name": req.name, "role": "athlete"}}
+    return {"token": create_token(uid, role),
+            "user": {"id": uid, "email": req.email, "name": req.name, "role": role}}
 
 @app.post("/api/auth/login")
 async def login(req: LoginRequest):
@@ -168,6 +171,7 @@ ALLOWED = {"video/mp4","video/quicktime","video/webm","video/x-msvideo"}
 @app.post("/api/sessions/upload")
 async def upload_video(background_tasks: BackgroundTasks,
                        exercise_type: str = "pushup",
+                       test_id: Optional[str] = None,
                        file: UploadFile = File(...),
                        user=Depends(get_current_user)):
     if file.content_type not in ALLOWED:
@@ -184,6 +188,7 @@ async def upload_video(background_tasks: BackgroundTasks,
     await db.test_sessions.insert_one({
         "_id": sid, "user_id": user["user_id"], "exercise_type": exercise_type,
         "video_path": str(vpath), "status": "processing",
+        "test_id": test_id,
         "created_at": now, "completed_at": None,
     })
     await db.processing_jobs.insert_one({
@@ -290,6 +295,7 @@ async def session_result(session_id: str, user=Depends(get_current_user)):
 @app.get("/api/admin/stats")
 async def admin_stats(admin=Depends(require_admin)):
     total_athletes = await db.users.count_documents({"role": "athlete"})
+    total_authorities = await db.users.count_documents({"role": "authority"})
     total_sessions = await db.test_sessions.count_documents({})
     completed      = await db.test_sessions.count_documents({"status": "completed"})
     cheat_flags    = await db.analysis_results.count_documents({"cheat_detected": True})
@@ -312,7 +318,8 @@ async def admin_stats(admin=Depends(require_admin)):
                "fitness_level": d.get("fitness_level", "—"),
                "created_at": d["created_at"].isoformat() if isinstance(d.get("created_at"), datetime) else ""}
               for d in recent_docs]
-    return {"total_athletes": total_athletes, "total_sessions": total_sessions,
+    return {"total_athletes": total_athletes, "total_authorities": total_authorities,
+            "total_sessions": total_sessions,
             "completed_sessions": completed, "avg_correctness_score": avg_score,
             "cheat_flags": cheat_flags,
             "exercise_breakdown": [{"exercise_type": d["_id"], "count": d["count"]} for d in ex_breakdown],
@@ -345,6 +352,47 @@ async def admin_athletes(age_min: Optional[int]=None, age_max: Optional[int]=Non
                           if isinstance(smap.get(str(u["_id"]), {}).get("last_test"), datetime) else None}
             for u in users]
 
+@app.get("/api/admin/authorities")
+async def admin_authorities(admin=Depends(require_admin)):
+    """Get all sports authority accounts with their test creation stats"""
+    # Fetch all authority users
+    authorities = await db.users.find({"role": "authority"}, {"password_hash": 0}).to_list(500)
+
+    # Get test creation stats for each authority
+    test_stats = await db.tests.aggregate([
+        {"$group": {
+            "_id": "$created_by",
+            "tests_created": {"$sum": 1}
+        }}
+    ]).to_list(500)
+    test_map = {d["_id"]: d["tests_created"] for d in test_stats}
+
+    # Get participant stats for each authority's tests
+    participant_stats = await db.test_registrations.aggregate([
+        {"$lookup": {
+            "from": "tests",
+            "localField": "test_id",
+            "foreignField": "_id",
+            "as": "test_info"
+        }},
+        {"$unwind": "$test_info"},
+        {"$group": {
+            "_id": "$test_info.created_by",
+            "total_participants": {"$sum": 1}
+        }}
+    ]).to_list(500)
+    participant_map = {d["_id"]: d["total_participants"] for d in participant_stats}
+
+    return [{
+        "id": str(auth["_id"]),
+        "name": auth["name"],
+        "email": auth["email"],
+        "created_at": auth["created_at"].isoformat() if isinstance(auth.get("created_at"), datetime) else None,
+        "tests_created": test_map.get(str(auth["_id"]), 0),
+        "total_participants": participant_map.get(str(auth["_id"]), 0),
+        "status": "Active"
+    } for auth in authorities]
+
 @app.get("/api/admin/results")
 async def admin_all_results(admin=Depends(require_admin)):
     docs = await db.analysis_results.find({}, {"frame_analyses": 0}).sort("created_at", -1).limit(100).to_list(100)
@@ -368,6 +416,228 @@ async def update_profile(req: UpdateProfileRequest, user=Depends(get_current_use
     if not updates: raise HTTPException(400, "No fields to update")
     await db.users.update_one({"_id": user["user_id"]}, {"$set": updates})
     return {"success": True}
+
+
+
+# ── Tests / Assessments ────────────────────────────────────────────────────
+
+BENCHMARKS = {
+    "pushup":        {"beginner": 10, "intermediate": 25, "advanced": 40},
+    "squat":         {"beginner": 8,  "intermediate": 20, "advanced": 35},
+    "situp":         {"beginner": 12, "intermediate": 28, "advanced": 45},
+    "vertical_jump": {"beginner": 20, "intermediate": 40, "advanced": 60},
+    "jumping_jack":  {"beginner": 15, "intermediate": 30, "advanced": 50},
+    "lunge":         {"beginner": 8,  "intermediate": 18, "advanced": 30},
+}
+
+def compute_test_score(result: dict, exercises: list) -> float:
+    ex_type = result.get("exercise_type", "")
+    bm = BENCHMARKS.get(ex_type, {})
+    adv = bm.get("advanced", 1) or 1
+    raw_val = result.get("jump_height_cm") if ex_type == "vertical_jump" else result.get("total_reps", 0)
+    raw_val = raw_val or 0
+    rep_score = min(100.0, (raw_val / adv) * 100)
+    form = result.get("avg_correctness_score") or 70
+    final = rep_score * (form / 100)
+    if result.get("cheat_detected"):
+        final *= 0.5
+    return round(final, 1)
+
+
+class CreateTestRequest(BaseModel):
+    name: str
+    sport: str
+    exercises: list
+    scheduled_date: str
+    start_time: str
+    duration_minutes: int
+    description: Optional[str] = None
+    max_participants: Optional[int] = None
+
+
+def require_authority(user=Depends(get_current_user)):
+    if user.get("role") not in ("admin", "authority"):
+        raise HTTPException(403, "Authority access required")
+    return user
+
+
+@app.post("/api/tests")
+async def create_test(req: CreateTestRequest, user=Depends(require_authority)):
+    creator = await db.users.find_one({"_id": user["user_id"]}, {"name": 1})
+    tid = str(uuid.uuid4())
+    await db.tests.insert_one({
+        "_id": tid, "name": req.name, "sport": req.sport,
+        "exercises": req.exercises,
+        "scheduled_date": req.scheduled_date, "start_time": req.start_time,
+        "duration_minutes": req.duration_minutes,
+        "description": req.description, "max_participants": req.max_participants,
+        "created_by": user["user_id"],
+        "created_by_name": creator.get("name", "") if creator else "",
+        "status": "upcoming",
+        "created_at": datetime.utcnow(),
+    })
+    return {"test_id": tid, "status": "upcoming"}
+
+
+def compute_test_status(test: dict) -> str:
+    """
+    Compute the actual test status based on scheduled date/time and duration.
+    - upcoming: before scheduled_date + start_time
+    - active: within the test window (scheduled_date + start_time to scheduled_date + start_time + duration)
+    - completed: after the test window or manually marked as completed
+    """
+    stored_status = test.get("status", "upcoming")
+
+    # If manually marked as completed, respect that
+    if stored_status == "completed":
+        return "completed"
+
+    try:
+        scheduled_date = test.get("scheduled_date")  # "YYYY-MM-DD"
+        start_time = test.get("start_time", "00:00")  # "HH:MM"
+        duration_minutes = test.get("duration_minutes", 60)
+
+        if not scheduled_date:
+            return stored_status
+
+        # Parse scheduled datetime
+        dt_str = f"{scheduled_date} {start_time}"
+        scheduled_dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
+        end_dt = scheduled_dt + timedelta(minutes=duration_minutes)
+        now = datetime.utcnow()
+
+        # Determine status based on current time
+        if now < scheduled_dt:
+            return "upcoming"
+        elif now >= scheduled_dt and now <= end_dt:
+            return "active"
+        else:
+            return "completed"
+    except Exception:
+        return stored_status
+
+
+@app.get("/api/tests")
+async def list_tests(status: Optional[str] = None, user=Depends(get_current_user)):
+    filt = {}
+    # Note: we don't filter by status in the query anymore since we compute it dynamically
+    docs = await db.tests.find(filt).sort("scheduled_date", 1).to_list(200)
+    result = []
+    for doc in docs:
+        s = serialize(doc)
+        # Compute real-time status
+        computed_status = compute_test_status(doc)
+        s["status"] = computed_status
+
+        # Filter by status if requested (after computing)
+        if status and computed_status != status:
+            continue
+
+        reg = await db.test_registrations.find_one({"test_id": str(doc["_id"]), "user_id": user["user_id"]})
+        s["is_registered"] = reg is not None
+        s["participant_count"] = await db.test_registrations.count_documents({"test_id": str(doc["_id"])})
+        result.append(s)
+    return result
+
+
+@app.get("/api/tests/{test_id}")
+async def get_test(test_id: str, user=Depends(get_current_user)):
+    doc = await db.tests.find_one({"_id": test_id})
+    if not doc: raise HTTPException(404, "Test not found")
+    s = serialize(doc)
+    # Compute real-time status
+    s["status"] = compute_test_status(doc)
+    reg = await db.test_registrations.find_one({"test_id": test_id, "user_id": user["user_id"]})
+    s["is_registered"] = reg is not None
+    s["participant_count"] = await db.test_registrations.count_documents({"test_id": test_id})
+    return s
+
+
+@app.patch("/api/tests/{test_id}/status")
+async def update_test_status(test_id: str, status: str, user=Depends(require_authority)):
+    if status not in ("upcoming", "active", "completed"):
+        raise HTTPException(400, "Invalid status")
+    res = await db.tests.update_one({"_id": test_id}, {"$set": {"status": status}})
+    if res.matched_count == 0: raise HTTPException(404, "Test not found")
+    return {"success": True}
+
+
+@app.post("/api/tests/{test_id}/register")
+async def register_for_test(test_id: str, user=Depends(get_current_user)):
+    if user.get("role") not in ("athlete",):
+        raise HTTPException(403, "Athletes only")
+    test = await db.tests.find_one({"_id": test_id})
+    if not test: raise HTTPException(404, "Test not found")
+
+    # Check computed status
+    computed_status = compute_test_status(test)
+    if computed_status == "completed":
+        raise HTTPException(400, "Test already completed")
+
+    try:
+        await db.test_registrations.insert_one({
+            "_id": str(uuid.uuid4()), "test_id": test_id,
+            "user_id": user["user_id"], "registered_at": datetime.utcnow(), "status": "registered",
+        })
+    except Exception:
+        raise HTTPException(409, "Already registered")
+    return {"success": True}
+
+
+@app.delete("/api/tests/{test_id}/register")
+async def unregister_from_test(test_id: str, user=Depends(get_current_user)):
+    res = await db.test_registrations.delete_one({"test_id": test_id, "user_id": user["user_id"]})
+    if res.deleted_count == 0: raise HTTPException(404, "Registration not found")
+    return {"success": True}
+
+
+@app.get("/api/tests/{test_id}/participants")
+async def test_participants(test_id: str, user=Depends(require_authority)):
+    regs = await db.test_registrations.find({"test_id": test_id}).to_list(500)
+    uid_list = [r["user_id"] for r in regs]
+    umap = {str(u["_id"]): u for u in
+            await db.users.find({"_id": {"$in": uid_list}}, {"password_hash": 0}).to_list(500)}
+    return [{"user_id": r["user_id"],
+             "registered_at": r["registered_at"].isoformat() if isinstance(r.get("registered_at"), datetime) else "",
+             "name": umap.get(r["user_id"], {}).get("name", "Unknown"),
+             "email": umap.get(r["user_id"], {}).get("email", "")} for r in regs]
+
+
+@app.get("/api/tests/{test_id}/leaderboard")
+async def test_leaderboard(test_id: str, user=Depends(get_current_user)):
+    test = await db.tests.find_one({"_id": test_id})
+    if not test: raise HTTPException(404, "Test not found")
+    sessions = await db.test_sessions.find({"test_id": test_id, "status": "completed"}).to_list(500)
+    sid_list = [str(s["_id"]) for s in sessions]
+    uid_list  = list({s["user_id"] for s in sessions})
+    results  = await db.analysis_results.find({"session_id": {"$in": sid_list}}).to_list(500)
+    rmap = {r["session_id"]: r for r in results}
+    umap = {str(u["_id"]): u for u in
+            await db.users.find({"_id": {"$in": uid_list}}, {"name": 1, "email": 1}).to_list(500)}
+    exercises = test.get("exercises", [])
+    best: dict = {}
+    for s in sessions:
+        uid  = s["user_id"]
+        sid  = str(s["_id"])
+        result = rmap.get(sid)
+        if not result: continue
+        score = compute_test_score(result, exercises)
+        if uid not in best or score > best[uid]["score"]:
+            best[uid] = {
+                "user_id": uid,
+                "name": umap.get(uid, {}).get("name", "Unknown"),
+                "email": umap.get(uid, {}).get("email", ""),
+                "total_reps": result.get("total_reps", 0),
+                "jump_height_cm": result.get("jump_height_cm"),
+                "avg_correctness_score": result.get("avg_correctness_score", 0),
+                "fitness_level": result.get("fitness_level", "Unknown"),
+                "form_grade": result.get("form_grade", "N/A"),
+                "cheat_detected": bool(result.get("cheat_detected", False)),
+                "score": score,
+            }
+    entries = sorted(best.values(), key=lambda x: x["score"], reverse=True)
+    for i, e in enumerate(entries): e["rank"] = i + 1
+    return entries
 
 
 # ── Health ─────────────────────────────────────────────────────────────────────

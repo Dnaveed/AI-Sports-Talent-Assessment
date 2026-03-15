@@ -103,6 +103,12 @@
   .form-footer a { color:var(--cyan); text-decoration:none; font-weight:500; }
   .form-footer a:hover { text-decoration:underline; }
   .form-footer a.admin-link { color:var(--purple); }
+  .form-footer a.authority-link { color:var(--amber); }
+  .role-card.authority.active { border-color:var(--amber); background:rgba(245,158,11,.06); box-shadow:0 0 20px rgba(245,158,11,.12); }
+  .role-card.authority .role-name { color:var(--amber); }
+  .role-indicator.authority { background:rgba(245,158,11,.1); color:var(--amber); border:1px solid rgba(245,158,11,.3); }
+  .submit-btn.authority-btn { background:linear-gradient(135deg,#f59e0b,#d97706); color:#000; }
+  .submit-btn.authority-btn:hover { box-shadow:0 8px 24px rgba(245,158,11,.35); }
 
   .error-msg { background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.3); border-radius:8px; padding:.65rem 1rem; font-size:.82rem; color:var(--red); margin-bottom:1rem; display:none; }
   .success-msg { background:rgba(16,185,129,.1); border:1px solid rgba(16,185,129,.3); border-radius:8px; padding:.65rem 1rem; font-size:.82rem; color:var(--green); margin-bottom:1rem; display:none; }
@@ -119,7 +125,7 @@
 <!-- LEFT — ROLE SELECTOR -->
 <div class="left-panel">
   <div class="brand">AthleteAI</div>
-  <p class="brand-sub">Join the platform. Choose your role to get started — athletes track their performance, admins manage the platform.</p>
+  <p class="brand-sub">Join the platform. Choose your role — athletes track performance, authorities schedule assessments.</p>
 
   <div class="role-preview-label">Select your role</div>
   <div class="role-preview">
@@ -129,7 +135,7 @@
       <div class="role-card-info">
         <div class="role-name">Athlete</div>
         <div class="role-perms">
-          <div class="role-perm">Upload workout videos</div>
+          <div class="role-perm">Join scheduled assessments</div>
           <div class="role-perm">View AI analysis & scores</div>
           <div class="role-perm">Track personal progress</div>
         </div>
@@ -137,14 +143,14 @@
       <span class="check-mark">✅</span>
     </div>
 
-    <div class="role-card admin" onclick="selectRole('admin')">
-      <div class="role-card-icon">⚡</div>
+    <div class="role-card authority" onclick="selectRole('authority')">
+      <div class="role-card-icon">🏛️</div>
       <div class="role-card-info">
-        <div class="role-name">Administrator</div>
+        <div class="role-name">Sports Authority</div>
         <div class="role-perms">
-          <div class="role-perm">Manage all athletes</div>
-          <div class="role-perm">View platform analytics</div>
-          <div class="role-perm">Review cheat flags</div>
+          <div class="role-perm">Create & schedule tests</div>
+          <div class="role-perm">View leaderboards</div>
+          <div class="role-perm">Shortlist athletes</div>
         </div>
       </div>
       <span class="check-mark">✅</span>
@@ -229,33 +235,32 @@ let selectedRole = 'athlete';
 function selectRole(role) {
   selectedRole = role;
 
-  // Update left panel cards
   document.querySelectorAll('.role-card').forEach(c => c.classList.remove('active'));
   document.querySelector('.role-card.' + role).classList.add('active');
 
-  // Update indicator
   const ind = document.getElementById('role-indicator');
   ind.className = 'role-indicator ' + role;
-  document.getElementById('indicator-text').textContent = role === 'admin' ? 'ADMIN REGISTRATION' : 'ATHLETE REGISTRATION';
+  const labels = { athlete: 'ATHLETE REGISTRATION', authority: 'AUTHORITY REGISTRATION', admin: 'ADMIN REGISTRATION' };
+  document.getElementById('indicator-text').textContent = labels[role] || 'REGISTRATION';
 
-  // Update form title / sub
-  document.getElementById('form-title').textContent = role === 'admin' ? 'Create Admin Account' : 'Create Athlete Account';
-  document.getElementById('form-sub').textContent   = role === 'admin' ? 'Set up your administrator account' : 'Fill in your details to get started';
+  const titles = { athlete: 'Create Athlete Account', authority: 'Create Authority Account', admin: 'Create Admin Account' };
+  const subs   = { athlete: 'Fill in your details to get started', authority: 'Register your sports organization', admin: 'Set up your administrator account' };
+  document.getElementById('form-title').textContent = titles[role];
+  document.getElementById('form-sub').textContent   = subs[role];
 
-  // Update submit button
+  const btnClasses = { athlete: 'athlete-btn', authority: 'authority-btn', admin: 'admin-btn' };
   const btn = document.getElementById('submit-btn');
-  btn.className = 'submit-btn ' + (role === 'admin' ? 'admin-btn' : 'athlete-btn');
-  btn.textContent = role === 'admin' ? 'Create Admin Account →' : 'Create Athlete Account →';
+  btn.className = 'submit-btn ' + (btnClasses[role] || 'athlete-btn');
+  btn.textContent = titles[role] + ' →';
 
-  // Show/hide athlete-specific fields
-  document.getElementById('athlete-fields').style.display = role === 'admin' ? 'none' : 'block';
+  document.getElementById('athlete-fields').style.display = role === 'athlete' ? 'block' : 'none';
 
-  // Update input focus colours
-  const focusClass = role === 'admin' ? 'purple-focus' : 'cyan-focus';
+  const focusClasses = { athlete: 'cyan-focus', authority: 'amber-focus', admin: 'purple-focus' };
+  const focusClass = focusClasses[role] || 'cyan-focus';
   document.querySelectorAll('input').forEach(i => { i.className = focusClass; });
 
-  // Update login link color
-  document.getElementById('login-link').className = role === 'admin' ? 'admin-link' : '';
+  const linkClasses = { authority: 'authority-link', admin: 'admin-link' };
+  document.getElementById('login-link').className = linkClasses[role] || '';
 }
 
 function showError(msg) {
@@ -285,16 +290,15 @@ async function handleRegister() {
   btn.textContent = 'Creating account...'; btn.disabled = true;
 
   const payload = {
-    name, email, password,
+    name, email, password, role: selectedRole,
     age:       parseInt(document.getElementById('age').value) || null,
     height_cm: parseFloat(document.getElementById('height')?.value) || null,
     weight_kg: parseFloat(document.getElementById('weight')?.value) || null,
   };
 
-  // Admin accounts registered via backend directly have role set server-side.
-  // For demo, we allow selecting admin here.
+  // Admin accounts use local override only (not registerable via public form in prod)
   if (selectedRole === 'admin') {
-    payload._role_request = 'admin'; // server can validate/ignore
+    payload.role = 'athlete'; // admin seeded server-side; treat as athlete on server
   }
 
   try {
@@ -310,15 +314,14 @@ async function handleRegister() {
     }
 
     const data = await res.json();
-    // Override role if admin was requested (demo/dev mode)
-    const user = { ...data.user, role: selectedRole };
+    const finalRole = selectedRole === 'admin' ? 'admin' : data.user.role;
+    const user = { ...data.user, role: finalRole };
     localStorage.setItem('token', data.token);
     localStorage.setItem('user', JSON.stringify(user));
 
     showSuccess('Account created! Redirecting...');
-    setTimeout(() => {
-      window.location.href = selectedRole === 'admin' ? 'admin.html' : 'athlete.html';
-    }, 1200);
+    const dest = finalRole === 'admin' || finalRole === 'authority' ? 'admin.html' : 'athlete.html';
+    setTimeout(() => { window.location.href = dest; }, 1200);
 
   } catch (e) {
     // Demo fallback
@@ -327,13 +330,13 @@ async function handleRegister() {
       localStorage.setItem('token', 'demo-token-' + selectedRole);
       localStorage.setItem('user', JSON.stringify(user));
       showSuccess('Demo account ready! Redirecting...');
-      setTimeout(() => {
-        window.location.href = selectedRole === 'admin' ? 'admin.html' : 'athlete.html';
-      }, 1200);
+      const dest = (selectedRole === 'admin' || selectedRole === 'authority') ? 'admin.html' : 'athlete.html';
+      setTimeout(() => { window.location.href = dest; }, 1200);
       return;
     }
     showError(e.message);
-    btn.textContent = selectedRole === 'admin' ? 'Create Admin Account →' : 'Create Athlete Account →';
+    const titles = { athlete: 'Create Athlete Account', authority: 'Create Authority Account', admin: 'Create Admin Account' };
+    btn.textContent = (titles[selectedRole] || 'Create Account') + ' →';
     btn.disabled = false;
   }
 }
