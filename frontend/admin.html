@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title id="page-title">AthleteAI — Admin Dashboard</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='75' font-size='75' fill='%238b5cf6'>⚙️</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -185,6 +186,26 @@
           <div id="recent-activity">Loading...</div>
         </div>
       </div>
+
+      <div class="card card-admin" style="margin-bottom:1.5rem">
+        <div class="section-header" style="margin-bottom:.9rem">
+          <span class="section-title">AI Drift Monitor</span>
+          <span style="font-size:.72rem;color:var(--muted);font-family:'JetBrains Mono',monospace">Live window: 14 days</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.75rem;margin-bottom:.9rem">
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.6rem .75rem"><div style="font-size:.62rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase">Mode</div><div id="ai-mode" style="font-family:'Bebas Neue',sans-serif;font-size:1.25rem;line-height:1.1">—</div></div>
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.6rem .75rem"><div style="font-size:.62rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase">Sample</div><div id="ai-sample" style="font-family:'Bebas Neue',sans-serif;font-size:1.25rem;line-height:1.1">—</div></div>
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.6rem .75rem"><div style="font-size:.62rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase">Confidence</div><div id="ai-confidence" style="font-family:'Bebas Neue',sans-serif;font-size:1.25rem;line-height:1.1">—</div></div>
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.6rem .75rem"><div style="font-size:.62rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase">Disagreement</div><div id="ai-disagreement" style="font-family:'Bebas Neue',sans-serif;font-size:1.25rem;line-height:1.1">—</div></div>
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.6rem .75rem"><div style="font-size:.62rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase">Flag Rate</div><div id="ai-qflag" style="font-family:'Bebas Neue',sans-serif;font-size:1.25rem;line-height:1.1">—</div></div>
+        </div>
+        <div id="ai-alerts" style="margin-bottom:.9rem"></div>
+        <div style="margin-bottom:.9rem;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.6rem .75rem">
+          <div style="font-size:.66rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.8px;margin-bottom:.4rem">Daily Trend (Confidence vs Disagreement)</div>
+          <canvas id="ai-trend-chart" height="120"></canvas>
+        </div>
+        <div id="ai-by-exercise" style="font-size:.82rem;color:var(--muted)">Loading AI metrics...</div>
+      </div>
     </section>
 
     <!-- ── CREATE TEST (AUTHORITY ONLY) ── -->
@@ -245,11 +266,11 @@
     <!-- ── MANAGE TESTS (AUTHORITY ONLY) ── -->
     <section id="sec-manage-tests" class="hidden authority-only">
       <div class="page-title">Manage Assessments</div>
-      <p class="page-sub">View and control all scheduled assessments</p>
+      <p class="page-sub">View all scheduled assessments • 🔄 Status updates automatically every minute based on current time</p>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem">
         <div class="filter-row" style="margin:0">
           <select id="mt-status-filter" onchange="loadManageTests()"><option value="">All</option><option value="upcoming">Upcoming</option><option value="active">Active</option><option value="completed">Completed</option></select>
-          <button class="btn btn-ghost btn-sm" onclick="loadManageTests()">🔄 Refresh</button>
+          <button class="btn btn-ghost btn-sm" onclick="loadManageTests()">🔄 Refresh Now</button>
         </div>
         <button class="btn btn-admin btn-sm" onclick="showSec('create-test')">+ Create New</button>
       </div>
@@ -400,6 +421,8 @@ async function api(method, path, body=null) {
 // ── Demo data ──────────────────────────────────────────────────────────────
 function demo(path) {
   if (path==='/admin/stats')   return mkStats();
+  if (path==='/admin/ai-metrics?days=14') return mkAiMetrics();
+  if (path==='/admin/ai-metrics') return mkAiMetrics();
   if (path==='/admin/results') return mkResults();
   if (path==='/admin/athletes') return mkAthletes();
   if (path==='/admin/authorities') return mkAuthorities();
@@ -425,6 +448,42 @@ function mkStats() {
       fitness_level:['Intermediate','Advanced','Beginner','Intermediate','Advanced','Beginner'][i],
       created_at: new Date(Date.now()-i*7200000).toISOString()
     }))
+  };
+}
+function mkAiMetrics() {
+  const today = new Date();
+  const trend = Array.from({length:14},(_,idx)=>{
+    const d = new Date(today);
+    d.setDate(today.getDate() - (13 - idx));
+    return {
+      date: d.toISOString().slice(0,10),
+      sample_size: 8 + (idx % 6),
+      confidence_score: 78 + Math.sin(idx/2) * 4,
+      rule_ml_disagreement: 10 + Math.cos(idx/3) * 2.2,
+      quality_flag_rate: 0.08 + ((idx % 5) * 0.012)
+    };
+  });
+
+  return {
+    window_days:14,
+    sample_size:312,
+    scoring_mode:'hybrid',
+    averages:{
+      rule_score:74.2,
+      ml_score:77.1,
+      hybrid_score:75.5,
+      confidence_score:81.8,
+      rule_ml_disagreement:9.4,
+      quality_flag_rate:0.142
+    },
+    drift_alerts:[],
+    by_exercise:{
+      pushup:{sample_size:98,hybrid_score:77.4,confidence_score:83.1},
+      squat:{sample_size:87,hybrid_score:74.9,confidence_score:80.2},
+      vertical_jump:{sample_size:64,hybrid_score:73.8,confidence_score:79.1},
+      jumping_jack:{sample_size:63,hybrid_score:76.6,confidence_score:82.3}
+    },
+    daily_trend: trend
   };
 }
 function mkResults() {
@@ -477,17 +536,34 @@ function mkDemoLeaderboard() {
 }
 
 // ── Navigation ─────────────────────────────────────────────────────────────
+var autoRefreshInterval = null;  // Use var for global scope safety
+
 function showSec(s) {
+  // Clear any existing auto-refresh interval
+  try {
+    if (autoRefreshInterval) {
+      clearInterval(autoRefreshInterval);
+      autoRefreshInterval = null;
+    }
+  } catch(e) { /* Ignore if interval doesn't exist */ }
+  
   document.querySelectorAll('[id^="sec-"]').forEach(el=>el.classList.add('hidden'));
   document.getElementById('sec-'+s)?.classList.remove('hidden');
   document.querySelectorAll('.sidebar-item').forEach(el=>el.classList.remove('active'));
   document.getElementById('sn-'+s)?.classList.add('active');
-  if      (s==='overview')          loadOverview();
+  if      (s==='overview') {
+    loadOverview();
+    autoRefreshInterval = setInterval(function() { loadAiMetrics(); }, 60000);
+  }
   else if (s==='athletes')          loadAthletes();
   else if (s==='authorities')       loadAuthorities();
   else if (s==='results')           loadResults();
   else if (s==='flags')             loadFlags();
-  else if (s==='manage-tests')      loadManageTests();
+  else if (s==='manage-tests') {
+    loadManageTests();
+    // Auto-refresh manage tests every 60 seconds to update status automatically
+    autoRefreshInterval = setInterval(function() { loadManageTests(); }, 60000);
+  }
   else if (s==='leaderboard-admin') { populateAdminTestSelect(); loadAdminLeaderboard(); }
 }
 
@@ -531,7 +607,98 @@ async function loadOverview() {
           <span class="badge ${lCol(a.fitness_level)}" style="font-size:.62rem">${a.fitness_level}</span>
         </div>
       </div>`).join('');
+
+    await loadAiMetrics();
   } catch(e) { console.error(e); toast('Failed to load stats','err'); }
+}
+
+async function loadAiMetrics() {
+  try {
+    const m = await api('GET','/admin/ai-metrics?days=14');
+    if (!m) return;
+
+    const av = m.averages || {};
+    document.getElementById('ai-mode').textContent = String(m.scoring_mode || 'unknown').toUpperCase();
+    document.getElementById('ai-sample').textContent = String(m.sample_size ?? 0);
+    document.getElementById('ai-confidence').textContent = `${(av.confidence_score ?? 0).toFixed(1)}%`;
+    document.getElementById('ai-disagreement').textContent = `${(av.rule_ml_disagreement ?? 0).toFixed(1)}%`;
+    document.getElementById('ai-qflag').textContent = `${((av.quality_flag_rate ?? 0) * 100).toFixed(1)}%`;
+
+    const alerts = Array.isArray(m.drift_alerts) ? m.drift_alerts : [];
+    document.getElementById('ai-alerts').innerHTML = alerts.length
+      ? `<div style="display:flex;gap:.45rem;flex-wrap:wrap">${alerts.map(a=>`<span class="badge badge-red">⚠ ${String(a).replaceAll('_',' ')}</span>`).join('')}</div>`
+      : '<span class="badge badge-green">✅ no drift alerts</span>';
+
+    const bx = m.by_exercise || {};
+    const rows = Object.entries(bx).sort((a,b)=>((b[1]?.sample_size||0)-(a[1]?.sample_size||0)));
+    document.getElementById('ai-by-exercise').innerHTML = rows.length
+      ? `<table class="tbl"><thead><tr><th>Exercise</th><th>Sample</th><th>Hybrid Score</th><th>Confidence</th></tr></thead><tbody>${rows.map(([ex,v])=>`<tr><td>${icon(ex)} ${fmtEx(ex)}</td><td>${v.sample_size||0}</td><td>${(v.hybrid_score??0).toFixed(1)}%</td><td>${(v.confidence_score??0).toFixed(1)}%</td></tr>`).join('')}</tbody></table>`
+      : '<div style="color:var(--muted)">No per-exercise AI data yet.</div>';
+
+    renderAiTrendChart(m.daily_trend || []);
+  } catch(e) {
+    const target = document.getElementById('ai-by-exercise');
+    if (target) target.innerHTML = `<div style="color:var(--red)">Failed to load AI metrics: ${e.message}</div>`;
+  }
+}
+
+function renderAiTrendChart(series) {
+  const canvas = document.getElementById('ai-trend-chart');
+  if (!canvas || !window.Chart) return;
+
+  const safeSeries = Array.isArray(series) ? series : [];
+  const labels = safeSeries.map(p => (p.date || '').slice(5));
+  const confidence = safeSeries.map(p => Number.isFinite(p?.confidence_score) ? p.confidence_score : null);
+  const disagreement = safeSeries.map(p => Number.isFinite(p?.rule_ml_disagreement) ? p.rule_ml_disagreement : null);
+
+  if (charts.aiTrend) charts.aiTrend.destroy();
+  charts.aiTrend = new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Confidence %',
+          data: confidence,
+          borderColor: '#10b981',
+          backgroundColor: 'rgba(16,185,129,.15)',
+          borderWidth: 2,
+          tension: .35,
+          pointRadius: 1.8,
+          spanGaps: true
+        },
+        {
+          label: 'Disagreement %',
+          data: disagreement,
+          borderColor: '#f59e0b',
+          backgroundColor: 'rgba(245,158,11,.15)',
+          borderWidth: 2,
+          tension: .35,
+          pointRadius: 1.8,
+          spanGaps: true
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: { color: '#5a7090', boxWidth: 10, boxHeight: 10, font: { size: 10 } }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#5a7090', font: { size: 10 } },
+          grid: { display: false }
+        },
+        y: {
+          ticks: { color: '#5a7090', font: { size: 10 } },
+          grid: { color: 'rgba(139,92,246,.08)' }
+        }
+      }
+    }
+  });
 }
 
 // ── Athletes ───────────────────────────────────────────────────────────────
@@ -767,13 +934,9 @@ async function loadManageTests() {
             <div style="font-size:.75rem;color:var(--muted)">Exercises: ${exList||'TBD'}</div>
           </div>
           <div style="display:flex;flex-direction:column;gap:.5rem;align-items:flex-end">
-            <div style="display:flex;align-items:center;gap:.5rem;font-size:.8rem">
-              <span style="color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:.62rem">STATUS:</span>
-              <select class="status-select" onchange="updateTestStatus('${t.id}',this.value)">
-                <option value="upcoming" ${t.status==='upcoming'?'selected':''}>Upcoming</option>
-                <option value="active"   ${t.status==='active'?'selected':''}>Active</option>
-                <option value="completed"${t.status==='completed'?'selected':''}>Completed</option>
-              </select>
+            <div style="display:flex;align-items:center;gap:.75rem;font-size:.8rem">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--muted);text-transform:uppercase">Status:</span>
+              <span class="badge badge-${t.status==='active'?'green':t.status==='completed'?'purple':'amber'}" style="font-size:.7rem;font-weight:600;cursor:help" title="Automatically updated based on scheduled date and time">🔄 ${t.status.toUpperCase()}</span>
             </div>
             <div style="display:flex;gap:.5rem">
               <button class="btn btn-ghost btn-sm" onclick="loadTestParticipants('${t.id}','${t.name}')">👥 Participants</button>
@@ -786,12 +949,6 @@ async function loadManageTests() {
   } catch(e) { container.innerHTML=`<div style="text-align:center;padding:2rem;color:var(--red)">${e.message}</div>`; }
 }
 
-async function updateTestStatus(testId, status) {
-  try {
-    await api('PATCH', `/tests/${testId}/status?status=${status}`);
-    toast(`Status updated to ${status}`,'ok');
-  } catch(e) { toast(e.message,'err'); loadManageTests(); }
-}
 
 async function loadTestParticipants(testId, testName) {
   try {

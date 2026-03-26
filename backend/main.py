@@ -21,13 +21,68 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 SECRET_KEY = os.environ.get("SECRET_KEY", "athleteai-secret-key-change-in-production")
 MONGO_URI  = os.environ.get("MONGO_URI", "mongodb://localhost:27017")
 MONGO_DB   = os.environ.get("MONGO_DB", "athleteai")
+SCORING_MODE = os.environ.get("SCORING_MODE", "hybrid")  # hybrid | shadow | rule_only
 
 client = db = None
+status_update_task = None  # Background task for updating test statuses
+
+
+async def update_all_test_statuses():
+    """
+    Background task that runs periodically to update test statuses based on current time.
+    Updates test statuses from upcoming→active→completed based on scheduled date/time.
+    This ensures both athlete and authority modules see consistent, auto-updated statuses.
+    """
+    global db
+    if db is None:
+        return
+    
+    try:
+        now = datetime.now()  # Use local time, not UTC
+        
+        # Get all tests that are not manually marked as completed
+        tests = await db.tests.find({"status": {"$ne": "completed"}}).to_list(None)
+        
+        for test in tests:
+            try:
+                scheduled_date = test.get("scheduled_date")
+                start_time = test.get("start_time", "00:00")
+                duration_minutes = test.get("duration_minutes", 60)
+                
+                if not scheduled_date:
+                    continue
+                
+                # Parse scheduled datetime
+                dt_str = f"{scheduled_date} {start_time}"
+                scheduled_dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
+                end_dt = scheduled_dt + timedelta(minutes=duration_minutes)
+                
+                # Determine new status based on current time
+                new_status = None
+                if now < scheduled_dt:
+                    new_status = "upcoming"
+                elif now >= scheduled_dt and now <= end_dt:
+                    new_status = "active"
+                else:
+                    new_status = "completed"
+                
+                # Update status in database if it changed
+                if new_status and new_status != test.get("status"):
+                    await db.tests.update_one(
+                        {"_id": test["_id"]},
+                        {"$set": {"status": new_status, "last_status_update": now}}
+                    )
+                    print(f"✓ Test '{test.get('name')}' status updated: {test.get('status')} → {new_status}")
+            except Exception as e:
+                print(f"⚠ Error updating test {test.get('_id')}: {e}")
+    except Exception as e:
+        print(f"⚠ Error in status update task: {e}")
+
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global client, db
+    global client, db, status_update_task
     client = AsyncIOMotorClient(MONGO_URI)
     db = client[MONGO_DB]
     await db.users.create_index("email", unique=True)
@@ -48,10 +103,40 @@ async def lifespan(app: FastAPI):
             "role": "admin", "age": None, "weight_kg": None, "height_cm": None,
             "created_at": datetime.utcnow(), "last_login": None,
         })
+    
+    # Start background task for automatic test status updates
+    status_update_task = asyncio.create_task(periodic_status_update())
     print(f"✅  MongoDB connected → {MONGO_URI}/{MONGO_DB}")
     print(f"📡  Open Compass and connect to: {MONGO_URI}")
+    print(f"🔄  Background test status updater started (updates every 5 minutes)")
+    
     yield
+    
+    # Cancel background task on shutdown
+    if status_update_task:
+        status_update_task.cancel()
+        try:
+            await status_update_task
+        except asyncio.CancelledError:
+            pass
     client.close()
+
+
+async def periodic_status_update():
+    """
+    Continuously runs test status updates every 5 minutes.
+    This ensures tests automatically transition between statuses (upcoming→active→completed).
+    """
+    while True:
+        try:
+            await asyncio.sleep(300)  # Wait 5 minutes between updates
+            await update_all_test_statuses()
+        except asyncio.CancelledError:
+            print("🛑  Test status updater task cancelled")
+            break
+        except Exception as e:
+            print(f"⚠ Error in periodic update: {e}")
+            await asyncio.sleep(5)  # Short delay on error
 
 
 app = FastAPI(title="AthleteAI API", version="2.0.0", lifespan=lifespan)
@@ -218,20 +303,75 @@ async def process_video_job(jid, sid, vpath, exercise_type, user_id):
 
         await prog(90)
         rid = str(uuid.uuid4()); pm = rd.get("performance_metrics", {})
+
+        # Build athlete-specific baseline for bounded personalization.
+        recent_same = await db.analysis_results.find(
+            {"user_id": user_id, "exercise_type": exercise_type},
+            {"avg_correctness_score": 1, "total_reps": 1, "jump_height_cm": 1, "created_at": 1}
+        ).sort("created_at", -1).limit(12).to_list(12)
+
+        baseline_form = round(
+            sum(d.get("avg_correctness_score", 0) for d in recent_same) / len(recent_same), 1
+        ) if recent_same else None
+        baseline_reps = round(
+            sum(d.get("total_reps", 0) for d in recent_same) / len(recent_same), 1
+        ) if recent_same else None
+        jump_vals = [d.get("jump_height_cm") for d in recent_same if d.get("jump_height_cm") is not None]
+        baseline_jump = round(sum(jump_vals) / len(jump_vals), 1) if jump_vals else None
+
+        rule_score_val = rd.get("rule_score", rd.get("avg_correctness_score", 0))
+        hybrid_score_val = rd.get("hybrid_form_score") or rd.get("avg_correctness_score", 0)
+
+        # Rollout safety: in shadow mode we keep legacy/rule score user-facing,
+        # while still storing hybrid score for offline comparison.
+        if SCORING_MODE == "shadow":
+            current_form = rule_score_val
+        elif SCORING_MODE == "rule_only":
+            current_form = rule_score_val
+        else:
+            current_form = hybrid_score_val
+
+        form_delta = round(current_form - baseline_form, 1) if baseline_form is not None else None
+        personalized_form_index = round(max(0.0, min(100.0, current_form + (form_delta or 0) * 0.2)), 1)
+
+        detailed_feedback = rd.get("detailed_feedback", {})
+        top_faults = detailed_feedback.get("top_faults", []) if isinstance(detailed_feedback, dict) else []
+
         await db.analysis_results.insert_one({
             "_id": rid, "session_id": sid, "user_id": user_id,
             "exercise_type": exercise_type,
             "total_reps": rd.get("total_reps", 0),
-            "avg_correctness_score": rd.get("avg_correctness_score", 0),
+            "avg_correctness_score": current_form,
             "jump_height_cm": rd.get("jump_height_cm"),
             "duration_seconds": rd.get("duration", 0),
             "reps_per_minute": rd.get("summary", {}).get("reps_per_minute", 0),
             "fitness_level": pm.get("fitness_level", "Unknown"),
             "form_grade": pm.get("form_grade", "N/A"),
             "estimated_percentile": pm.get("estimated_percentile", 0),
+            "rule_score": rule_score_val,
+            "ml_score": rd.get("ml_score", rd.get("avg_correctness_score", 0)),
+            "hybrid_form_score": hybrid_score_val,
+            "confidence_score": rd.get("confidence_score", 0),
+            "analysis_version": rd.get("analysis_version", "v2"),
+            "scoring_mode": SCORING_MODE,
+            "shadow_scores": {
+                "rule_score": rule_score_val,
+                "hybrid_score": hybrid_score_val,
+            },
             "cheat_detected": bool(rd.get("cheat_detected", False)),
             "cheat_reasons": rd.get("cheat_reasons", []),
             "frame_analyses": rd.get("frame_analyses", [])[:100],
+            "rep_breakdown": rd.get("rep_breakdown", [])[:60],
+            "detailed_feedback": detailed_feedback,
+            "top_faults": top_faults,
+            "personalization": {
+                "baseline_form_score": baseline_form,
+                "baseline_reps": baseline_reps,
+                "baseline_jump_height_cm": baseline_jump,
+                "current_form_delta": form_delta,
+                "personalized_form_index": personalized_form_index,
+                "history_window": len(recent_same),
+            },
             "performance_metrics": pm,
             "created_at": datetime.utcnow(),
         })
@@ -251,7 +391,23 @@ def _sim(ex):
             "total_reps": r, "avg_correctness_score": round(c, 1),
             "jump_height_cm": round(random.uniform(30, 60), 1) if ex == "vertical_jump" else None,
             "cheat_detected": False, "cheat_reasons": [], "frame_analyses": [],
-            "summary": {"reps_per_minute": round(r * 2, 1)},
+            "rule_score": round(c - random.uniform(1, 4), 1),
+            "ml_score": round(c + random.uniform(1, 3), 1),
+            "hybrid_form_score": round(c, 1),
+            "confidence_score": round(random.uniform(70, 95), 1),
+            "analysis_version": "v3.0-hybrid-rules",
+            "rep_breakdown": [
+                {"rep": i + 1, "quality_score": round(max(45, min(100, c + random.uniform(-8, 8))), 1), "faults": []}
+                for i in range(min(10, r))
+            ],
+            "detailed_feedback": {
+                "top_faults": [],
+                "phase_scores": {"setup": c, "eccentric": c - 3, "bottom": c - 5, "concentric": c - 2, "finish": c - 1},
+                "recommendations": ["Maintain consistent pace and full range on every rep."],
+                "quality_flags": [],
+                "usable_frame_rate": 0.9,
+            },
+            "summary": {"reps_per_minute": round(r * 2, 1), "analysis_version": "v3.0-hybrid-rules"},
             "performance_metrics": {"fitness_level": random.choice(["Beginner","Intermediate","Advanced"]),
                                     "form_grade": random.choice(["A","B","C"]),
                                     "estimated_percentile": random.randint(30, 90),
@@ -408,6 +564,131 @@ async def admin_all_results(admin=Depends(require_admin)):
     return results
 
 
+@app.get("/api/admin/ai-metrics")
+async def admin_ai_metrics(days: int = 14, admin=Depends(require_admin)):
+    """Operational monitoring for scorer quality, disagreement, and confidence drift."""
+    clamped_days = max(1, min(days, 90))
+    now_utc = datetime.utcnow()
+    window_start = now_utc - timedelta(days=clamped_days)
+    docs = await db.analysis_results.find(
+        {"created_at": {"$gte": window_start}},
+        {
+            "exercise_type": 1,
+            "rule_score": 1,
+            "ml_score": 1,
+            "hybrid_form_score": 1,
+            "confidence_score": 1,
+            "detailed_feedback": 1,
+            "created_at": 1,
+        },
+    ).to_list(5000)
+
+    if not docs:
+        return {
+            "window_days": clamped_days,
+            "sample_size": 0,
+            "status": "no_data",
+            "scoring_mode": SCORING_MODE,
+            "daily_trend": [],
+        }
+
+    def avg(vals):
+        return round(sum(vals) / len(vals), 2) if vals else 0.0
+
+    rule_vals = [float(d.get("rule_score", 0) or 0) for d in docs]
+    ml_vals = [float(d.get("ml_score", 0) or 0) for d in docs]
+    hybrid_vals = [float(d.get("hybrid_form_score", d.get("avg_correctness_score", 0)) or 0) for d in docs]
+    conf_vals = [float(d.get("confidence_score", 0) or 0) for d in docs]
+    disagreement_vals = [abs(r - m) for r, m in zip(rule_vals, ml_vals)]
+
+    quality_flag_count = 0
+    for d in docs:
+        fb = d.get("detailed_feedback") or {}
+        if (fb.get("quality_flags") or []):
+            quality_flag_count += 1
+
+    drift_alerts = []
+    if avg(conf_vals) < 62:
+        drift_alerts.append("low_confidence_trend")
+    if avg(disagreement_vals) > 18:
+        drift_alerts.append("high_rule_ml_disagreement")
+    if quality_flag_count / max(1, len(docs)) > 0.35:
+        drift_alerts.append("high_capture_quality_issues")
+
+    by_exercise = {}
+    daily_trend_buckets = {}
+    for d in docs:
+        ex = d.get("exercise_type", "unknown")
+        by_exercise.setdefault(ex, {"n": 0, "hybrid": [], "confidence": []})
+        by_exercise[ex]["n"] += 1
+        by_exercise[ex]["hybrid"].append(float(d.get("hybrid_form_score", 0) or 0))
+        by_exercise[ex]["confidence"].append(float(d.get("confidence_score", 0) or 0))
+
+        created_at = d.get("created_at")
+        if isinstance(created_at, str):
+            try:
+                created_at = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
+            except ValueError:
+                created_at = None
+        if isinstance(created_at, datetime):
+            day_key = created_at.date().isoformat()
+            daily_trend_buckets.setdefault(day_key, {"n": 0, "confidence": [], "disagreement": [], "qflags": 0})
+            bucket = daily_trend_buckets[day_key]
+            rule_v = float(d.get("rule_score", 0) or 0)
+            ml_v = float(d.get("ml_score", 0) or 0)
+            bucket["n"] += 1
+            bucket["confidence"].append(float(d.get("confidence_score", 0) or 0))
+            bucket["disagreement"].append(abs(rule_v - ml_v))
+            if ((d.get("detailed_feedback") or {}).get("quality_flags") or []):
+                bucket["qflags"] += 1
+
+    daily_trend = []
+    for idx in range(clamped_days):
+        day_iso = (now_utc.date() - timedelta(days=(clamped_days - 1 - idx))).isoformat()
+        bucket = daily_trend_buckets.get(day_iso)
+        if not bucket:
+            daily_trend.append({
+                "date": day_iso,
+                "sample_size": 0,
+                "confidence_score": None,
+                "rule_ml_disagreement": None,
+                "quality_flag_rate": None,
+            })
+            continue
+
+        daily_trend.append({
+            "date": day_iso,
+            "sample_size": bucket["n"],
+            "confidence_score": avg(bucket["confidence"]),
+            "rule_ml_disagreement": avg(bucket["disagreement"]),
+            "quality_flag_rate": round(bucket["qflags"] / max(1, bucket["n"]), 3),
+        })
+
+    return {
+        "window_days": clamped_days,
+        "sample_size": len(docs),
+        "scoring_mode": SCORING_MODE,
+        "averages": {
+            "rule_score": avg(rule_vals),
+            "ml_score": avg(ml_vals),
+            "hybrid_score": avg(hybrid_vals),
+            "confidence_score": avg(conf_vals),
+            "rule_ml_disagreement": avg(disagreement_vals),
+            "quality_flag_rate": round(quality_flag_count / max(1, len(docs)), 3),
+        },
+        "drift_alerts": drift_alerts,
+        "by_exercise": {
+            ex: {
+                "sample_size": vals["n"],
+                "hybrid_score": avg(vals["hybrid"]),
+                "confidence_score": avg(vals["confidence"]),
+            }
+            for ex, vals in by_exercise.items()
+        },
+        "daily_trend": daily_trend,
+    }
+
+
 # ── Profile ────────────────────────────────────────────────────────────────────
 
 @app.put("/api/profile")
@@ -504,7 +785,7 @@ def compute_test_status(test: dict) -> str:
         dt_str = f"{scheduled_date} {start_time}"
         scheduled_dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
         end_dt = scheduled_dt + timedelta(minutes=duration_minutes)
-        now = datetime.utcnow()
+        now = datetime.now()  # Use local time, not UTC
 
         # Determine status based on current time
         if now < scheduled_dt:
