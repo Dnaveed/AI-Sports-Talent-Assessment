@@ -137,6 +137,14 @@
   .recording-indicator{display:inline-flex;align-items:center;gap:.5rem;padding:.4rem .8rem;border-radius:6px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);font-size:.75rem;color:var(--red);font-family:'JetBrains Mono',monospace;font-weight:500}
   .recording-dot{width:6px;height:6px;border-radius:50%;background:var(--red);animation:pulse 1s infinite}
 
+  .video-modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(2,6,12,.8);backdrop-filter:blur(4px);z-index:1100;padding:1rem;}
+  .video-modal.open{display:flex;}
+  .video-card{width:min(900px,96vw);background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:0 20px 45px rgba(0,0,0,.45);overflow:hidden;}
+  .video-head{display:flex;justify-content:space-between;align-items:center;padding:.75rem .9rem;border-bottom:1px solid rgba(0,212,255,.16);}
+  .video-title{font-family:'Bebas Neue',sans-serif;font-size:1.05rem;letter-spacing:.6px;}
+  .video-body{padding:.85rem;}
+  .video-body video{width:100%;max-height:72vh;border-radius:8px;background:#000;}
+
 </style>
 </head>
 <body>
@@ -267,8 +275,8 @@
       </div>
       <div class="card">
         <table class="tbl">
-          <thead><tr><th>Exercise</th><th>Date</th><th>Reps</th><th>Form Score</th><th>Level</th><th>Grade</th><th>Cheat?</th><th></th></tr></thead>
-          <tbody id="history-body"><tr><td colspan="8" style="text-align:center;color:var(--muted);padding:2rem">Loading...</td></tr></tbody>
+          <thead><tr><th>Exercise</th><th>Date</th><th>Reps</th><th>Form Score</th><th>Level</th><th>Grade</th><th>Cheat?</th><th>Recording</th><th></th></tr></thead>
+          <tbody id="history-body"><tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem">Loading...</td></tr></tbody>
         </table>
       </div>
     </section>
@@ -347,6 +355,18 @@
 </div>
 
 <div id="toast-c"></div>
+
+<div id="history-video-modal" class="video-modal" onclick="closeHistoryVideo(event)">
+  <div class="video-card" onclick="event.stopPropagation()">
+    <div class="video-head">
+      <div id="history-video-title" class="video-title">Test Recording</div>
+      <button class="btn btn-ghost btn-sm" onclick="closeHistoryVideo()">✕ Close</button>
+    </div>
+    <div class="video-body">
+      <video id="history-video-player" controls playsinline preload="metadata"></video>
+    </div>
+  </div>
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script>
@@ -659,13 +679,13 @@ async function submitVideo() {
 // ── History ────────────────────────────────────────────────────────────────
 async function loadHistory() {
   const tb=document.getElementById('history-body');
-  tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:2rem">Loading...</td></tr>';
+  tb.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem">Loading...</td></tr>';
   try {
     let res=await api('GET','/results'); if(!res) return;
     const ef=document.getElementById('f-exercise').value, lf=document.getElementById('f-level').value;
     if(ef) res=res.filter(r=>r.exercise_type===ef);
     if(lf) res=res.filter(r=>r.fitness_level===lf);
-    if(!res.length){tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:2rem">No results found</td></tr>';return;}
+    if(!res.length){tb.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem">No results found</td></tr>';return;}
     tb.innerHTML=res.map(r=>`<tr>
       <td>${icon(r.exercise_type)} ${fmtEx(r.exercise_type)}</td>
       <td style="color:var(--muted)">${fmtDate(r.created_at)}</td>
@@ -674,9 +694,54 @@ async function loadHistory() {
       <td><span class="badge ${lCol(r.fitness_level)}">${r.fitness_level||'—'}</span></td>
       <td><span class="badge ${gCol(r.form_grade)}">${r.form_grade||'—'}</span></td>
       <td>${r.cheat_detected?'<span class="badge badge-red">⚠️ Flag</span>':'<span class="badge badge-green">✓</span>'}</td>
+      <td>${r.session_id?`<button class="btn btn-ghost btn-sm" onclick="openHistoryVideo('${r.session_id}','${fmtEx(r.exercise_type)}')">▶ Watch</button>`:'<span style="font-size:.74rem;color:var(--muted)">No video</span>'}</td>
       <td><button class="btn btn-ghost btn-sm" onclick="loadResult('${r.id}')">View →</button></td>
     </tr>`).join('');
-  } catch(e){tb.innerHTML=`<tr><td colspan="8" style="color:var(--red);text-align:center;padding:2rem">${e.message}</td></tr>`;}
+  } catch(e){tb.innerHTML=`<tr><td colspan="9" style="color:var(--red);text-align:center;padding:2rem">${e.message}</td></tr>`;}
+}
+
+let historyVideoObjectUrl = null;
+async function openHistoryVideo(sessionId, label) {
+  const modal = document.getElementById('history-video-modal');
+  const title = document.getElementById('history-video-title');
+  const player = document.getElementById('history-video-player');
+  if (!modal || !title || !player || !sessionId) return;
+
+  title.textContent = `Test Recording — ${label || 'Exercise'}`;
+  modal.classList.add('open');
+  player.removeAttribute('src');
+  player.load();
+
+  try {
+    const res = await fetch(`${API}/sessions/${sessionId}/video`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error(`Unable to load video (${res.status})`);
+    const blob = await res.blob();
+    if (historyVideoObjectUrl) URL.revokeObjectURL(historyVideoObjectUrl);
+    historyVideoObjectUrl = URL.createObjectURL(blob);
+    player.src = historyVideoObjectUrl;
+    await player.play().catch(()=>{});
+  } catch(e) {
+    closeHistoryVideo();
+    toast(e.message || 'Failed to load recording', 'err');
+  }
+}
+
+function closeHistoryVideo(evt) {
+  if (evt && evt.target && evt.target.id !== 'history-video-modal') return;
+  const modal = document.getElementById('history-video-modal');
+  const player = document.getElementById('history-video-player');
+  if (player) {
+    player.pause();
+    player.removeAttribute('src');
+    player.load();
+  }
+  if (historyVideoObjectUrl) {
+    URL.revokeObjectURL(historyVideoObjectUrl);
+    historyVideoObjectUrl = null;
+  }
+  modal?.classList.remove('open');
 }
 
 async function loadResult(id) {
@@ -702,13 +767,18 @@ function showResult(r) {
   const ruleScore=(r.rule_score ?? r.avg_correctness_score ?? 0);
   const mlScore=(r.ml_score ?? r.avg_correctness_score ?? 0);
   const hybridScore=(r.hybrid_form_score ?? r.avg_correctness_score ?? 0);
+  const durationSecRaw = Number(r.duration_seconds);
+  const durationSec = Number.isFinite(durationSecRaw) && durationSecRaw >= 0 && durationSecRaw < 36000 ? durationSecRaw : 0;
+  const metricValue = Number(pm.metric_value);
+  const safeMetricValue = Number.isFinite(metricValue) ? metricValue : (Number(r.total_reps) || 0);
+  const metricUnit = pm.metric_unit || 'reps';
   document.getElementById('result-body').innerHTML=`
     <div class="result-hero">
       <div style="display:flex;gap:2rem;flex-wrap:wrap;align-items:flex-start">
         <div><div style="font-size:.72rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase;margin-bottom:.5rem">Form Grade</div><div class="result-grade">${r.form_grade||'N/A'}</div></div>
         <div style="flex:1;min-width:200px">
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:1rem;margin-top:.25rem">
-            ${metricBox(r.total_reps,'Reps')}${metricBox(hybridScore?.toFixed(0)+'%','Hybrid Form')}${metricBox(confidenceScore?.toFixed(0)+'%','Confidence')}${metricBox(r.duration_seconds?.toFixed(0)+'s','Duration')}${metricBox((pm.estimated_percentile||0)+'%ile','Percentile')}${r.jump_height_cm?metricBox(r.jump_height_cm+'cm','Jump Height'):''}
+            ${metricBox(r.total_reps,'Reps')}${metricBox(hybridScore?.toFixed(0)+'%','Hybrid Form')}${metricBox(confidenceScore?.toFixed(0)+'%','Confidence')}${metricBox(durationSec.toFixed(0)+'s','Duration')}${metricBox((pm.estimated_percentile||0)+'%ile','Percentile')}${r.jump_height_cm?metricBox(r.jump_height_cm+'cm','Jump Height'):''}
           </div>
           <div style="margin-top:1.25rem;display:flex;gap:.5rem;flex-wrap:wrap">
             <span class="badge ${lCol(r.fitness_level)}">${r.fitness_level||'Unknown'}</span>
@@ -723,7 +793,7 @@ function showResult(r) {
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
       <div class="card">
         <div class="section-title" style="margin-bottom:1rem">vs Benchmarks</div>
-        ${pm.benchmarks?Object.entries(pm.benchmarks).map(([lvl,val])=>`<div style="margin-bottom:.75rem"><div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:4px"><span style="text-transform:capitalize">${lvl}</span><span style="color:var(--muted)">${val} ${pm.metric_unit}</span></div><div class="prog-bar"><div class="prog-fill" style="width:${Math.min((pm.metric_value/val)*100,100)}%;background:${lvl==='advanced'?'var(--green)':lvl==='intermediate'?'var(--cyan)':'var(--amber)'}"></div></div></div>`).join('')+'<div style="font-size:.8rem;color:var(--muted);margin-top:.5rem">Your score: <strong style="color:var(--text)">${pm.metric_value} ${pm.metric_unit}</strong></div>'
+        ${pm.benchmarks?Object.entries(pm.benchmarks).map(([lvl,val])=>`<div style="margin-bottom:.75rem"><div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:4px"><span style="text-transform:capitalize">${lvl}</span><span style="color:var(--muted)">${val} ${metricUnit}</span></div><div class="prog-bar"><div class="prog-fill" style="width:${Math.min((safeMetricValue/val)*100,100)}%;background:${lvl==='advanced'?'var(--green)':lvl==='intermediate'?'var(--cyan)':'var(--amber)'}"></div></div></div>`).join('')+`<div style="font-size:.8rem;color:var(--muted);margin-top:.5rem">Your score: <strong style="color:var(--text)">${safeMetricValue} ${metricUnit}</strong></div>`
         :'<div style="color:var(--muted)">No benchmark data</div>'}
       </div>
       <div class="card">

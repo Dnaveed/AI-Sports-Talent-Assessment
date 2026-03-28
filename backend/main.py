@@ -7,6 +7,7 @@ Collections: users, test_sessions,processing_jobs, analysis_results
 """
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, BackgroundTasks
+from fastapi.responses import FileResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -165,6 +166,35 @@ def serialize(doc: dict) -> dict:
 def sl(docs) -> list: return [serialize(d) for d in docs]
 
 
+def sanitize_analysis_doc(doc: dict) -> dict:
+    """Clamp/normalize analysis numerics so UI never gets sentinel/corrupt values."""
+    if not doc:
+        return doc
+
+    out = dict(doc)
+
+    def safe_float(value, default=0.0):
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return float(default)
+
+    # Duration should be a practical non-negative value in seconds.
+    duration = safe_float(out.get("duration_seconds", 0.0), 0.0)
+    if duration < 0 or duration > 10 * 60 * 60:  # 10 hours upper bound for safety
+        duration = 0.0
+    out["duration_seconds"] = round(duration, 1)
+
+    total_reps = safe_float(out.get("total_reps", 0.0), 0.0)
+    out["total_reps"] = int(max(0, min(total_reps, 10000)))
+
+    for key in ("avg_correctness_score", "rule_score", "ml_score", "hybrid_form_score", "confidence_score"):
+        if key in out:
+            out[key] = round(max(0.0, min(100.0, safe_float(out.get(key, 0.0), 0.0))), 1)
+
+    return out
+
+
 # ── Auth helpers ───────────────────────────────────────────────────────────────
 
 def hash_password(p: str) -> str:
@@ -291,15 +321,12 @@ async def process_video_job(jid, sid, vpath, exercise_type, user_id):
 
     await db.processing_jobs.update_one({"_id": jid}, {"$set": {"status": "processing"}})
     try:
-        try:
-            import sys
-            sys.path.insert(0, str(Path(__file__).parent.parent / "pose_module"))
-            from pose_analyzer import VideoProcessor
-            loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(None, lambda: VideoProcessor().process_video(vpath, exercise_type))
-            rd = result.__dict__
-        except ImportError:
-            await asyncio.sleep(3); rd = _sim(exercise_type)
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent.parent / "pose_module"))
+        from pose_analyzer import VideoProcessor
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, lambda: VideoProcessor().process_video(vpath, exercise_type))
+        rd = result.__dict__
 
         await prog(90)
         rid = str(uuid.uuid4()); pm = rd.get("performance_metrics", {})
@@ -337,13 +364,20 @@ async def process_video_job(jid, sid, vpath, exercise_type, user_id):
         detailed_feedback = rd.get("detailed_feedback", {})
         top_faults = detailed_feedback.get("top_faults", []) if isinstance(detailed_feedback, dict) else []
 
+        try:
+            duration_seconds_val = float(rd.get("duration", 0) or 0)
+        except (TypeError, ValueError):
+            duration_seconds_val = 0.0
+        if duration_seconds_val < 0 or duration_seconds_val > 10 * 60 * 60:
+            duration_seconds_val = 0.0
+
         await db.analysis_results.insert_one({
             "_id": rid, "session_id": sid, "user_id": user_id,
             "exercise_type": exercise_type,
             "total_reps": rd.get("total_reps", 0),
             "avg_correctness_score": current_form,
             "jump_height_cm": rd.get("jump_height_cm"),
-            "duration_seconds": rd.get("duration", 0),
+            "duration_seconds": round(duration_seconds_val, 1),
             "reps_per_minute": rd.get("summary", {}).get("reps_per_minute", 0),
             "fitness_level": pm.get("fitness_level", "Unknown"),
             "form_grade": pm.get("form_grade", "N/A"),
@@ -422,6 +456,54 @@ async def job_status(job_id: str, user=Depends(get_current_user)):
     return serialize(doc)
 
 
+@app.get("/api/sessions/{session_id}/video")
+async def get_session_video(session_id: str, user=Depends(get_current_user)):
+    """Stream a recorded test video for authorized users.
+
+    Access:
+    - athlete: own session only
+    - admin: any session
+    - authority: only sessions tied to tests they created
+    """
+    session = await db.test_sessions.find_one({"_id": session_id})
+    if not session:
+        raise HTTPException(404, "Session not found")
+
+    role = user.get("role")
+    uid = user.get("user_id")
+
+    if role == "athlete":
+        if session.get("user_id") != uid:
+            raise HTTPException(403, "Access denied")
+    elif role == "authority":
+        test_id = session.get("test_id")
+        if not test_id:
+            raise HTTPException(403, "Access denied")
+        test = await db.tests.find_one({"_id": test_id}, {"created_by": 1})
+        if not test or test.get("created_by") != uid:
+            raise HTTPException(403, "Access denied")
+    elif role != "admin":
+        raise HTTPException(403, "Access denied")
+
+    video_path = session.get("video_path")
+    if not video_path:
+        raise HTTPException(404, "Video not available")
+    path_obj = Path(video_path)
+    if not path_obj.exists() or not path_obj.is_file():
+        raise HTTPException(404, "Video file not found")
+
+    media_type = "video/mp4"
+    suffix = path_obj.suffix.lower()
+    if suffix == ".webm":
+        media_type = "video/webm"
+    elif suffix in (".mov", ".qt"):
+        media_type = "video/quicktime"
+    elif suffix == ".avi":
+        media_type = "video/x-msvideo"
+
+    return FileResponse(path_obj, media_type=media_type, filename=path_obj.name)
+
+
 # ── Results ────────────────────────────────────────────────────────────────────
 
 @app.get("/api/results")
@@ -429,7 +511,7 @@ async def my_results(user=Depends(get_current_user)):
     docs = await db.analysis_results.find(
         {"user_id": user["user_id"]}, {"frame_analyses": 0}
     ).sort("created_at", -1).limit(50).to_list(50)
-    return sl(docs)
+    return [serialize(sanitize_analysis_doc(d)) for d in docs]
 
 @app.get("/api/results/{result_id}")
 async def get_result(result_id: str, user=Depends(get_current_user)):
@@ -437,13 +519,13 @@ async def get_result(result_id: str, user=Depends(get_current_user)):
     if not doc: raise HTTPException(404, "Not found")
     if doc["user_id"] != user["user_id"] and user.get("role") != "admin":
         raise HTTPException(403, "Access denied")
-    return serialize(doc)
+    return serialize(sanitize_analysis_doc(doc))
 
 @app.get("/api/sessions/{session_id}/result")
 async def session_result(session_id: str, user=Depends(get_current_user)):
     doc = await db.analysis_results.find_one({"session_id": session_id})
     if not doc: raise HTTPException(404, "No result yet")
-    return serialize(doc)
+    return serialize(sanitize_analysis_doc(doc))
 
 
 # ── Admin ──────────────────────────────────────────────────────────────────────
@@ -557,7 +639,7 @@ async def admin_all_results(admin=Depends(require_admin)):
             await db.users.find({"_id": {"$in": uid_list}}, {"name": 1, "email": 1}).to_list(200)}
     results = []
     for d in docs:
-        s = serialize(d)
+        s = serialize(sanitize_analysis_doc(d))
         u = umap.get(d["user_id"], {})
         s["athlete_name"] = u.get("name", "Unknown"); s["athlete_email"] = u.get("email", "")
         results.append(s)
@@ -602,14 +684,24 @@ async def admin_ai_metrics(days: int = 14, admin=Depends(require_admin)):
     disagreement_vals = [abs(r - m) for r, m in zip(rule_vals, ml_vals)]
 
     quality_flag_count = 0
+    invalid_capture_count = 0
+    valid_conf_vals = []
     for d in docs:
         fb = d.get("detailed_feedback") or {}
-        if (fb.get("quality_flags") or []):
+        qflags = fb.get("quality_flags") or []
+        invalid_attempt = bool(fb.get("invalid_attempt")) or ("invalid_assessment_capture" in qflags)
+        if qflags:
             quality_flag_count += 1
+        if invalid_attempt:
+            invalid_capture_count += 1
+        else:
+            valid_conf_vals.append(float(d.get("confidence_score", 0) or 0))
 
     drift_alerts = []
     if avg(conf_vals) < 62:
         drift_alerts.append("low_confidence_trend")
+    if valid_conf_vals and avg(valid_conf_vals) < 70:
+        drift_alerts.append("low_valid_capture_confidence")
     if avg(disagreement_vals) > 18:
         drift_alerts.append("high_rule_ml_disagreement")
     if quality_flag_count / max(1, len(docs)) > 0.35:
@@ -618,11 +710,19 @@ async def admin_ai_metrics(days: int = 14, admin=Depends(require_admin)):
     by_exercise = {}
     daily_trend_buckets = {}
     for d in docs:
+        fb = d.get("detailed_feedback") or {}
+        qflags = fb.get("quality_flags") or []
+        invalid_attempt = bool(fb.get("invalid_attempt")) or ("invalid_assessment_capture" in qflags)
+
         ex = d.get("exercise_type", "unknown")
-        by_exercise.setdefault(ex, {"n": 0, "hybrid": [], "confidence": []})
+        by_exercise.setdefault(ex, {"n": 0, "hybrid": [], "confidence": [], "valid_confidence": [], "invalid_n": 0})
         by_exercise[ex]["n"] += 1
         by_exercise[ex]["hybrid"].append(float(d.get("hybrid_form_score", 0) or 0))
         by_exercise[ex]["confidence"].append(float(d.get("confidence_score", 0) or 0))
+        if invalid_attempt:
+            by_exercise[ex]["invalid_n"] += 1
+        else:
+            by_exercise[ex]["valid_confidence"].append(float(d.get("confidence_score", 0) or 0))
 
         created_at = d.get("created_at")
         if isinstance(created_at, str):
@@ -632,15 +732,22 @@ async def admin_ai_metrics(days: int = 14, admin=Depends(require_admin)):
                 created_at = None
         if isinstance(created_at, datetime):
             day_key = created_at.date().isoformat()
-            daily_trend_buckets.setdefault(day_key, {"n": 0, "confidence": [], "disagreement": [], "qflags": 0})
+            daily_trend_buckets.setdefault(
+                day_key,
+                {"n": 0, "confidence": [], "valid_confidence": [], "disagreement": [], "qflags": 0, "invalid_n": 0},
+            )
             bucket = daily_trend_buckets[day_key]
             rule_v = float(d.get("rule_score", 0) or 0)
             ml_v = float(d.get("ml_score", 0) or 0)
             bucket["n"] += 1
             bucket["confidence"].append(float(d.get("confidence_score", 0) or 0))
             bucket["disagreement"].append(abs(rule_v - ml_v))
-            if ((d.get("detailed_feedback") or {}).get("quality_flags") or []):
+            if qflags:
                 bucket["qflags"] += 1
+            if invalid_attempt:
+                bucket["invalid_n"] += 1
+            else:
+                bucket["valid_confidence"].append(float(d.get("confidence_score", 0) or 0))
 
     daily_trend = []
     for idx in range(clamped_days):
@@ -651,8 +758,11 @@ async def admin_ai_metrics(days: int = 14, admin=Depends(require_admin)):
                 "date": day_iso,
                 "sample_size": 0,
                 "confidence_score": None,
+                "valid_confidence_score": None,
+                "valid_sample_size": 0,
                 "rule_ml_disagreement": None,
                 "quality_flag_rate": None,
+                "invalid_capture_rate": None,
             })
             continue
 
@@ -660,8 +770,11 @@ async def admin_ai_metrics(days: int = 14, admin=Depends(require_admin)):
             "date": day_iso,
             "sample_size": bucket["n"],
             "confidence_score": avg(bucket["confidence"]),
+            "valid_confidence_score": avg(bucket["valid_confidence"]),
+            "valid_sample_size": max(0, bucket["n"] - bucket["invalid_n"]),
             "rule_ml_disagreement": avg(bucket["disagreement"]),
             "quality_flag_rate": round(bucket["qflags"] / max(1, bucket["n"]), 3),
+            "invalid_capture_rate": round(bucket["invalid_n"] / max(1, bucket["n"]), 3),
         })
 
     return {
@@ -673,8 +786,10 @@ async def admin_ai_metrics(days: int = 14, admin=Depends(require_admin)):
             "ml_score": avg(ml_vals),
             "hybrid_score": avg(hybrid_vals),
             "confidence_score": avg(conf_vals),
+            "valid_capture_confidence_score": avg(valid_conf_vals),
             "rule_ml_disagreement": avg(disagreement_vals),
             "quality_flag_rate": round(quality_flag_count / max(1, len(docs)), 3),
+            "invalid_capture_rate": round(invalid_capture_count / max(1, len(docs)), 3),
         },
         "drift_alerts": drift_alerts,
         "by_exercise": {
@@ -682,6 +797,8 @@ async def admin_ai_metrics(days: int = 14, admin=Depends(require_admin)):
                 "sample_size": vals["n"],
                 "hybrid_score": avg(vals["hybrid"]),
                 "confidence_score": avg(vals["confidence"]),
+                "valid_capture_confidence_score": avg(vals["valid_confidence"]),
+                "invalid_capture_rate": round(vals["invalid_n"] / max(1, vals["n"]), 3),
             }
             for ex, vals in by_exercise.items()
         },
@@ -903,9 +1020,11 @@ async def test_leaderboard(test_id: str, user=Depends(get_current_user)):
         result = rmap.get(sid)
         if not result: continue
         score = compute_test_score(result, exercises)
+        has_video = bool(s.get("video_path")) and Path(s.get("video_path", "")).exists()
         if uid not in best or score > best[uid]["score"]:
             best[uid] = {
                 "user_id": uid,
+                "session_id": sid,
                 "name": umap.get(uid, {}).get("name", "Unknown"),
                 "email": umap.get(uid, {}).get("email", ""),
                 "total_reps": result.get("total_reps", 0),
@@ -914,6 +1033,7 @@ async def test_leaderboard(test_id: str, user=Depends(get_current_user)):
                 "fitness_level": result.get("fitness_level", "Unknown"),
                 "form_grade": result.get("form_grade", "N/A"),
                 "cheat_detected": bool(result.get("cheat_detected", False)),
+                "video_available": has_video,
                 "score": score,
             }
     entries = sorted(best.values(), key=lambda x: x["score"], reverse=True)

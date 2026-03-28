@@ -95,6 +95,14 @@
   .section-title{font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:.5px;}
   .hidden{display:none!important;}
 
+  .video-modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(2,6,12,.78);backdrop-filter:blur(4px);z-index:1200;padding:1rem;}
+  .video-modal.open{display:flex;}
+  .video-card{width:min(940px,96vw);background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:0 20px 45px rgba(0,0,0,.45);overflow:hidden;}
+  .video-head{display:flex;justify-content:space-between;align-items:center;padding:.75rem .9rem;border-bottom:1px solid rgba(139,92,246,.16);}
+  .video-title{font-family:'Bebas Neue',sans-serif;font-size:1.05rem;letter-spacing:.6px;}
+  .video-body{padding:.85rem;}
+  .video-body video{width:100%;max-height:72vh;border-radius:8px;background:#000;}
+
   /* RECENT ACTIVITY */
   .activity-item{display:flex;justify-content:space-between;align-items:center;padding:.75rem 0;border-bottom:1px solid rgba(139,92,246,.1);}
   .activity-item:last-child{border-bottom:none;}
@@ -195,14 +203,24 @@
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.75rem;margin-bottom:.9rem">
           <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.6rem .75rem"><div style="font-size:.62rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase">Mode</div><div id="ai-mode" style="font-family:'Bebas Neue',sans-serif;font-size:1.25rem;line-height:1.1">—</div></div>
           <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.6rem .75rem"><div style="font-size:.62rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase">Sample</div><div id="ai-sample" style="font-family:'Bebas Neue',sans-serif;font-size:1.25rem;line-height:1.1">—</div></div>
-          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.6rem .75rem"><div style="font-size:.62rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase">Confidence</div><div id="ai-confidence" style="font-family:'Bebas Neue',sans-serif;font-size:1.25rem;line-height:1.1">—</div></div>
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.6rem .75rem"><div style="font-size:.62rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase">Overall Conf</div><div id="ai-confidence" style="font-family:'Bebas Neue',sans-serif;font-size:1.25rem;line-height:1.1">—</div></div>
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.6rem .75rem"><div style="font-size:.62rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase">Valid Conf</div><div id="ai-valid-confidence" style="font-family:'Bebas Neue',sans-serif;font-size:1.25rem;line-height:1.1">—</div></div>
           <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.6rem .75rem"><div style="font-size:.62rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase">Disagreement</div><div id="ai-disagreement" style="font-family:'Bebas Neue',sans-serif;font-size:1.25rem;line-height:1.1">—</div></div>
-          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.6rem .75rem"><div style="font-size:.62rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase">Flag Rate</div><div id="ai-qflag" style="font-family:'Bebas Neue',sans-serif;font-size:1.25rem;line-height:1.1">—</div></div>
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.6rem .75rem"><div style="font-size:.62rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase">Invalid Rate</div><div id="ai-invalid-rate" style="font-family:'Bebas Neue',sans-serif;font-size:1.25rem;line-height:1.1">—</div></div>
         </div>
+        <div id="ai-health-note" style="font-size:.75rem;color:var(--muted);margin-bottom:.9rem"></div>
         <div id="ai-alerts" style="margin-bottom:.9rem"></div>
-        <div style="margin-bottom:.9rem;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.6rem .75rem">
-          <div style="font-size:.66rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.8px;margin-bottom:.4rem">Daily Trend (Confidence vs Disagreement)</div>
-          <canvas id="ai-trend-chart" height="120"></canvas>
+        <div style="margin:0 auto .9rem auto;max-width:980px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.75rem .9rem">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;margin-bottom:.4rem">
+            <div style="font-size:.66rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.8px">Daily Trend (Confidence vs Disagreement)</div>
+            <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+              <button id="ai-metric-valid" class="btn btn-sm" onclick="setAiTrendMetric('valid')" style="padding:.25rem .55rem;font-size:.65rem;line-height:1;background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.35);color:var(--green)">Valid Confidence</button>
+              <button id="ai-metric-overall" class="btn btn-sm" onclick="setAiTrendMetric('overall')" style="padding:.25rem .55rem;font-size:.65rem;line-height:1;background:var(--surface3);border:1px solid var(--border);color:var(--muted)">Overall Confidence</button>
+            </div>
+          </div>
+          <div style="height:250px;position:relative">
+            <canvas id="ai-trend-chart"></canvas>
+          </div>
         </div>
         <div id="ai-by-exercise" style="font-size:.82rem;color:var(--muted)">Loading AI metrics...</div>
       </div>
@@ -361,6 +379,18 @@
 
 <div id="toast-c"></div>
 
+<div id="lb-video-modal" class="video-modal" onclick="closeLeaderboardVideo(event)">
+  <div class="video-card" onclick="event.stopPropagation()">
+    <div class="video-head">
+      <div id="lb-video-title" class="video-title">Athlete Recording</div>
+      <button class="btn btn-ghost btn-sm" onclick="closeLeaderboardVideo()">✕ Close</button>
+    </div>
+    <div class="video-body">
+      <video id="lb-video-player" controls playsinline preload="metadata"></video>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script>
 const API   = 'http://localhost:8000/api';
@@ -368,6 +398,7 @@ const token = localStorage.getItem('token');
 const user  = JSON.parse(localStorage.getItem('user') || 'null');
 let charts  = {};
 let allResults = null; // cache
+let aiTrendMetric = 'valid';
 
 // ── Guard ─────────────────────────────────────────────────────────────────
 if (!token || !user) {
@@ -459,8 +490,11 @@ function mkAiMetrics() {
       date: d.toISOString().slice(0,10),
       sample_size: 8 + (idx % 6),
       confidence_score: 78 + Math.sin(idx/2) * 4,
+      valid_confidence_score: 84 + Math.sin(idx/2.2) * 3,
+      valid_sample_size: 7 + (idx % 5),
       rule_ml_disagreement: 10 + Math.cos(idx/3) * 2.2,
-      quality_flag_rate: 0.08 + ((idx % 5) * 0.012)
+      quality_flag_rate: 0.08 + ((idx % 5) * 0.012),
+      invalid_capture_rate: 0.12 + ((idx % 4) * 0.018)
     };
   });
 
@@ -473,15 +507,17 @@ function mkAiMetrics() {
       ml_score:77.1,
       hybrid_score:75.5,
       confidence_score:81.8,
+      valid_capture_confidence_score:86.1,
       rule_ml_disagreement:9.4,
-      quality_flag_rate:0.142
+      quality_flag_rate:0.142,
+      invalid_capture_rate:0.116
     },
     drift_alerts:[],
     by_exercise:{
-      pushup:{sample_size:98,hybrid_score:77.4,confidence_score:83.1},
-      squat:{sample_size:87,hybrid_score:74.9,confidence_score:80.2},
-      vertical_jump:{sample_size:64,hybrid_score:73.8,confidence_score:79.1},
-      jumping_jack:{sample_size:63,hybrid_score:76.6,confidence_score:82.3}
+      pushup:{sample_size:98,hybrid_score:77.4,confidence_score:83.1,valid_capture_confidence_score:87.3,invalid_capture_rate:0.1},
+      squat:{sample_size:87,hybrid_score:74.9,confidence_score:80.2,valid_capture_confidence_score:84.4,invalid_capture_rate:0.14},
+      vertical_jump:{sample_size:64,hybrid_score:73.8,confidence_score:79.1,valid_capture_confidence_score:82.2,invalid_capture_rate:0.19},
+      jumping_jack:{sample_size:63,hybrid_score:76.6,confidence_score:82.3,valid_capture_confidence_score:85.5,invalid_capture_rate:0.12}
     },
     daily_trend: trend
   };
@@ -532,7 +568,7 @@ function mkDemoTests() {
 function mkDemoLeaderboard() {
   const names=['Rahul Singh','Ahmed Al-Farsi','Priya Patel','John Smith','Emma Watson','Carlos Diaz'];
   const emails=['rahul@demo.com','ahmed@demo.com','priya@demo.com','john@demo.com','emma@demo.com','carlos@demo.com'];
-  return names.map((name,i)=>({rank:i+1,user_id:'u'+i,name,email:emails[i],score:94-i*4,form_grade:['A','A','B','B','C','C'][i],avg_correctness_score:91-i*3,total_reps:35-i*3,fitness_level:['Advanced','Advanced','Intermediate','Intermediate','Beginner','Beginner'][i],cheat_detected:i===4}));
+  return names.map((name,i)=>({rank:i+1,user_id:'u'+i,session_id:'s-demo-'+i,video_available:true,name,email:emails[i],score:94-i*4,form_grade:['A','A','B','B','C','C'][i],avg_correctness_score:91-i*3,total_reps:35-i*3,fitness_level:['Advanced','Advanced','Intermediate','Intermediate','Beginner','Beginner'][i],cheat_detected:i===4}));
 }
 
 // ── Navigation ─────────────────────────────────────────────────────────────
@@ -621,8 +657,14 @@ async function loadAiMetrics() {
     document.getElementById('ai-mode').textContent = String(m.scoring_mode || 'unknown').toUpperCase();
     document.getElementById('ai-sample').textContent = String(m.sample_size ?? 0);
     document.getElementById('ai-confidence').textContent = `${(av.confidence_score ?? 0).toFixed(1)}%`;
+    document.getElementById('ai-valid-confidence').textContent = `${(av.valid_capture_confidence_score ?? 0).toFixed(1)}%`;
     document.getElementById('ai-disagreement').textContent = `${(av.rule_ml_disagreement ?? 0).toFixed(1)}%`;
-    document.getElementById('ai-qflag').textContent = `${((av.quality_flag_rate ?? 0) * 100).toFixed(1)}%`;
+    document.getElementById('ai-invalid-rate').textContent = `${((av.invalid_capture_rate ?? 0) * 100).toFixed(1)}%`;
+
+    const validConf = Number(av.valid_capture_confidence_score ?? 0);
+    const invalidRate = Number(av.invalid_capture_rate ?? 0) * 100;
+    document.getElementById('ai-health-note').textContent = `Overall confidence includes invalid attempts. Valid-capture confidence isolates high-quality captures (${validConf.toFixed(1)}%), while invalid capture rate is ${invalidRate.toFixed(1)}%.`;
+    setAiTrendMetric(aiTrendMetric);
 
     const alerts = Array.isArray(m.drift_alerts) ? m.drift_alerts : [];
     document.getElementById('ai-alerts').innerHTML = alerts.length
@@ -632,7 +674,7 @@ async function loadAiMetrics() {
     const bx = m.by_exercise || {};
     const rows = Object.entries(bx).sort((a,b)=>((b[1]?.sample_size||0)-(a[1]?.sample_size||0)));
     document.getElementById('ai-by-exercise').innerHTML = rows.length
-      ? `<table class="tbl"><thead><tr><th>Exercise</th><th>Sample</th><th>Hybrid Score</th><th>Confidence</th></tr></thead><tbody>${rows.map(([ex,v])=>`<tr><td>${icon(ex)} ${fmtEx(ex)}</td><td>${v.sample_size||0}</td><td>${(v.hybrid_score??0).toFixed(1)}%</td><td>${(v.confidence_score??0).toFixed(1)}%</td></tr>`).join('')}</tbody></table>`
+      ? `<table class="tbl"><thead><tr><th>Exercise</th><th>Sample</th><th>Hybrid Score</th><th>Valid Conf</th><th>Invalid Rate</th></tr></thead><tbody>${rows.map(([ex,v])=>`<tr><td>${icon(ex)} ${fmtEx(ex)}</td><td>${v.sample_size||0}</td><td>${(v.hybrid_score??0).toFixed(1)}%</td><td>${(v.valid_capture_confidence_score??0).toFixed(1)}%</td><td>${((v.invalid_capture_rate??0)*100).toFixed(1)}%</td></tr>`).join('')}</tbody></table>`
       : '<div style="color:var(--muted)">No per-exercise AI data yet.</div>';
 
     renderAiTrendChart(m.daily_trend || []);
@@ -642,14 +684,46 @@ async function loadAiMetrics() {
   }
 }
 
+function setAiTrendMetric(mode) {
+  aiTrendMetric = (mode === 'overall') ? 'overall' : 'valid';
+  const bValid = document.getElementById('ai-metric-valid');
+  const bOverall = document.getElementById('ai-metric-overall');
+  if (bValid && bOverall) {
+    const validActive = aiTrendMetric === 'valid';
+    bValid.style.background = validActive ? 'rgba(16,185,129,.15)' : 'var(--surface3)';
+    bValid.style.borderColor = validActive ? 'rgba(16,185,129,.35)' : 'var(--border)';
+    bValid.style.color = validActive ? 'var(--green)' : 'var(--muted)';
+    bOverall.style.background = !validActive ? 'rgba(0,212,255,.12)' : 'var(--surface3)';
+    bOverall.style.borderColor = !validActive ? 'rgba(0,212,255,.35)' : 'var(--border)';
+    bOverall.style.color = !validActive ? 'var(--cyan)' : 'var(--muted)';
+  }
+  if (window.__lastAiTrendSeries) renderAiTrendChart(window.__lastAiTrendSeries);
+}
+
 function renderAiTrendChart(series) {
   const canvas = document.getElementById('ai-trend-chart');
   if (!canvas || !window.Chart) return;
+  window.__lastAiTrendSeries = Array.isArray(series) ? series : [];
 
-  const safeSeries = Array.isArray(series) ? series : [];
-  const labels = safeSeries.map(p => (p.date || '').slice(5));
-  const confidence = safeSeries.map(p => Number.isFinite(p?.confidence_score) ? p.confidence_score : null);
-  const disagreement = safeSeries.map(p => Number.isFinite(p?.rule_ml_disagreement) ? p.rule_ml_disagreement : null);
+  const safeSeries = (Array.isArray(series) ? series : [])
+    .map(p => {
+      const confidenceVal = Number(p?.confidence_score);
+      const validConfidenceVal = Number(p?.valid_confidence_score);
+      const disagreementVal = Number(p?.rule_ml_disagreement);
+      return {
+        date: String(p?.date || ''),
+        confidence_score: Number.isFinite(confidenceVal) ? Math.max(0, Math.min(100, confidenceVal)) : null,
+        valid_confidence_score: Number.isFinite(validConfidenceVal) ? Math.max(0, Math.min(100, validConfidenceVal)) : null,
+        rule_ml_disagreement: Number.isFinite(disagreementVal) ? Math.max(0, Math.min(100, disagreementVal)) : null,
+      };
+    })
+    .filter(p => p.date)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const labels = safeSeries.map(p => p.date.slice(5));
+  const useOverall = aiTrendMetric === 'overall';
+  const confidence = safeSeries.map(p => useOverall ? p.confidence_score : (p.valid_confidence_score ?? p.confidence_score));
+  const disagreement = safeSeries.map(p => p.rule_ml_disagreement);
 
   if (charts.aiTrend) charts.aiTrend.destroy();
   charts.aiTrend = new Chart(canvas.getContext('2d'), {
@@ -658,14 +732,15 @@ function renderAiTrendChart(series) {
       labels,
       datasets: [
         {
-          label: 'Confidence %',
+          label: useOverall ? 'Overall Confidence %' : 'Valid Confidence %',
           data: confidence,
           borderColor: '#10b981',
           backgroundColor: 'rgba(16,185,129,.15)',
           borderWidth: 2,
-          tension: .35,
-          pointRadius: 1.8,
-          spanGaps: true
+          tension: 0,
+          pointRadius: 2,
+          pointHoverRadius: 3,
+          spanGaps: false
         },
         {
           label: 'Disagreement %',
@@ -673,9 +748,10 @@ function renderAiTrendChart(series) {
           borderColor: '#f59e0b',
           backgroundColor: 'rgba(245,158,11,.15)',
           borderWidth: 2,
-          tension: .35,
-          pointRadius: 1.8,
-          spanGaps: true
+          tension: 0,
+          pointRadius: 2,
+          pointHoverRadius: 3,
+          spanGaps: false
         }
       ]
     },
@@ -689,10 +765,14 @@ function renderAiTrendChart(series) {
       },
       scales: {
         x: {
+          offset: true,
           ticks: { color: '#5a7090', font: { size: 10 } },
           grid: { display: false }
         },
         y: {
+          beginAtZero: true,
+          min: 0,
+          max: 100,
           ticks: { color: '#5a7090', font: { size: 10 } },
           grid: { color: 'rgba(139,92,246,.08)' }
         }
@@ -996,10 +1076,11 @@ async function loadAdminLeaderboard() {
           <button class="btn btn-ghost btn-sm" onclick="exportShortlist('${testId}')">📥 Export Shortlist</button>
         </div>
         <div class="card"><table class="tbl">
-        <thead><tr><th>Rank</th><th>Athlete</th><th>Score</th><th>Grade</th><th>Reps</th><th>Form</th><th>Level</th><th>Status</th><th>Shortlist</th></tr></thead>
+        <thead><tr><th>Rank</th><th>Athlete</th><th>Score</th><th>Grade</th><th>Reps</th><th>Form</th><th>Level</th><th>Status</th><th>Recording</th><th>Shortlist</th></tr></thead>
         <tbody>${entries.map(e=>{
           const medal=e.rank===1?'🥇':e.rank===2?'🥈':e.rank===3?'🥉':'';
           const isSL = shortlisted.has(e.user_id);
+          const canWatch = !!e.session_id && (e.video_available !== false);
           return `<tr>
             <td><strong style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem">${medal}${e.rank}</strong></td>
             <td><div style="font-weight:600">${e.name}</div><div style="font-size:.72rem;color:var(--muted)">${e.email||''}</div></td>
@@ -1009,6 +1090,7 @@ async function loadAdminLeaderboard() {
             <td>${sBar(e.avg_correctness_score)}</td>
             <td><span class="badge ${lCol(e.fitness_level)}">${e.fitness_level||'—'}</span></td>
             <td>${e.cheat_detected?'<span class="badge badge-red">⚠️ Flagged</span>':'<span class="badge badge-green">✓ Clean</span>'}</td>
+            <td>${canWatch?`<button class="btn btn-ghost btn-sm" onclick="openLeaderboardVideo('${e.session_id}','${String(e.name||'Athlete').replace(/'/g,"\\'")}')">▶ Watch</button>`:'<span style="font-size:.74rem;color:var(--muted)">No video</span>'}</td>
             <td><span class="shortlist-badge ${isSL?'shortlisted':''}" onclick="toggleShortlist('${testId}','${e.user_id}',this)">${isSL?'★ Shortlisted':'☆ Shortlist'}</span></td>
           </tr>`;
         }).join('')}</tbody></table></div>`;
@@ -1035,6 +1117,50 @@ function exportShortlist(testId) {
   a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
   a.download = `shortlist_${testId}.csv`; a.click();
   toast(`Exported ${entries.length} shortlisted athletes`,'ok');
+}
+
+let lbVideoObjectUrl = null;
+async function openLeaderboardVideo(sessionId, athleteName) {
+  const modal = document.getElementById('lb-video-modal');
+  const title = document.getElementById('lb-video-title');
+  const player = document.getElementById('lb-video-player');
+  if (!modal || !title || !player) return;
+
+  title.textContent = `Test Recording — ${athleteName || 'Athlete'}`;
+  modal.classList.add('open');
+  player.removeAttribute('src');
+  player.load();
+
+  try {
+    const res = await fetch(`${API}/sessions/${sessionId}/video`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error(`Unable to load video (${res.status})`);
+    const blob = await res.blob();
+    if (lbVideoObjectUrl) URL.revokeObjectURL(lbVideoObjectUrl);
+    lbVideoObjectUrl = URL.createObjectURL(blob);
+    player.src = lbVideoObjectUrl;
+    await player.play().catch(()=>{});
+  } catch (e) {
+    closeLeaderboardVideo();
+    toast(e.message || 'Failed to load recording', 'err');
+  }
+}
+
+function closeLeaderboardVideo(evt) {
+  if (evt && evt.target && evt.target.id !== 'lb-video-modal') return;
+  const modal = document.getElementById('lb-video-modal');
+  const player = document.getElementById('lb-video-player');
+  if (player) {
+    player.pause();
+    player.removeAttribute('src');
+    player.load();
+  }
+  if (lbVideoObjectUrl) {
+    URL.revokeObjectURL(lbVideoObjectUrl);
+    lbVideoObjectUrl = null;
+  }
+  modal?.classList.remove('open');
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────

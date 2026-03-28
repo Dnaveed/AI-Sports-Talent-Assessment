@@ -610,6 +610,26 @@ class CheatDetector:
 class VideoProcessor:
     ANALYSIS_VERSION = "v3.0-hybrid-rules"
 
+    @staticmethod
+    def _required_joints_for_exercise(exercise_type: str) -> List[str]:
+        base = ["left_shoulder", "right_shoulder", "left_hip", "right_hip"]
+        if exercise_type in (ExerciseType.SQUAT, ExerciseType.LUNGE, ExerciseType.VERTICAL_JUMP):
+            return base + ["left_knee", "right_knee", "left_ankle", "right_ankle"]
+        if exercise_type == ExerciseType.JUMPING_JACK:
+            return base + ["left_wrist", "right_wrist", "left_ankle", "right_ankle"]
+        if exercise_type == ExerciseType.PUSHUP:
+            return base + ["left_elbow", "right_elbow", "left_wrist", "right_wrist"]
+        if exercise_type == ExerciseType.SITUP:
+            return base + ["left_knee", "right_knee"]
+        return base
+
+    def _exercise_joints_visible(self, keypoints: dict, exercise_type: str, min_vis: float = 0.45) -> bool:
+        required = self._required_joints_for_exercise(exercise_type)
+        if not required:
+            return True
+        visible = sum(1 for name in required if keypoints.get(name, {}).get("visibility", 0) >= min_vis)
+        return (visible / len(required)) >= 0.75
+
     def get_exercise_analyzer(self, exercise_type: str):
         et = ExerciseType(exercise_type)
         if et == ExerciseType.PUSHUP:
@@ -714,6 +734,7 @@ class VideoProcessor:
         frame_scores = []
         conf_vals = []
         usable_frames = 0
+        low_joint_visibility_frames = 0
 
         sample_every = max(1, int(fps / 10))
         frame_number = 0
@@ -739,14 +760,22 @@ class VideoProcessor:
                 face_vis = PoseAnalyzer.check_face_visible(kp)
                 avg_conf = float(np.mean([k["visibility"] for k in kp.values()]))
                 conf_vals.append(avg_conf)
+                exercise_visible = self._exercise_joints_visible(kp, exercise_type)
+                if not exercise_visible:
+                    low_joint_visibility_frames += 1
 
-                vis_gate = avg_conf >= 0.45
+                vis_gate = avg_conf >= 0.45 and exercise_visible
                 if not vis_gate:
+                    issue = (
+                        "Required body joints are not visible for this exercise"
+                        if not exercise_visible
+                        else "Low pose confidence - improve camera angle/lighting"
+                    )
                     analysis = {
                         "rep_count": analyzer.rep_count,
                         "phase": getattr(analyzer, "phase", "unknown"),
-                        "correctness": 35.0,
-                        "issues": ["Low pose confidence - improve camera angle/lighting"],
+                        "correctness": 0.0,
+                        "issues": [issue],
                     }
                 else:
                     usable_frames += 1
@@ -813,6 +842,31 @@ class VideoProcessor:
             ),
         )
 
+        invalid_reasons = []
+        no_rep_ex = exercise_type in (
+            ExerciseType.PUSHUP,
+            ExerciseType.SQUAT,
+            ExerciseType.JUMPING_JACK,
+            ExerciseType.SITUP,
+            ExerciseType.LUNGE,
+            ExerciseType.VERTICAL_JUMP,
+        )
+        if len(frame_scores) < 8:
+            invalid_reasons.append("insufficient_pose_samples")
+        if usable_rate < 0.35:
+            invalid_reasons.append("insufficient_usable_frames")
+        if len(frame_scores) > 0 and (low_joint_visibility_frames / len(frame_scores)) > 0.5:
+            invalid_reasons.append("exercise_joints_not_visible")
+        if no_rep_ex and total_reps == 0 and usable_rate < 0.6:
+            invalid_reasons.append("no_detectable_exercise_motion")
+
+        invalid_attempt = len(invalid_reasons) > 0
+        if invalid_attempt:
+            rule_score = min(rule_score, 5.0)
+            ml_score = min(ml_score, 5.0)
+            hybrid = min(hybrid, 5.0)
+            confidence_score = min(confidence_score, 15.0)
+
         quality_flags = []
         if usable_rate < 0.7:
             quality_flags.append("low_usable_frame_rate")
@@ -820,6 +874,21 @@ class VideoProcessor:
             quality_flags.append("low_landmark_confidence")
         if disagreement > 18:
             quality_flags.append("rule_model_disagreement")
+        if invalid_attempt:
+            quality_flags.append("invalid_assessment_capture")
+            for reason in invalid_reasons:
+                if reason not in quality_flags:
+                    quality_flags.append(reason)
+
+        if invalid_attempt:
+            cheat_report["detected"] = True
+            reason_text = "Invalid capture for selected exercise"
+            if reason_text not in cheat_report["reasons"]:
+                cheat_report["reasons"].append(reason_text)
+            if "exercise_joints_not_visible" in invalid_reasons:
+                cheat_report["reasons"].append("Lower-body joints were not visible for most analyzed frames")
+            if "no_detectable_exercise_motion" in invalid_reasons:
+                cheat_report["reasons"].append("No detectable rep motion for the selected exercise")
 
         top_faults = [
             {"type": k, "count": v, "frequency_percent": round(v / max(1, total_reps) * 100, 1)}
@@ -832,9 +901,19 @@ class VideoProcessor:
                 k: round(self._mean_or_zero(v), 1) if isinstance(v, list) else 0.0
                 for k, v in phase_scores.items()
             },
-            "recommendations": self._build_recommendations(fault_counts, exercise_type),
+            "recommendations": (
+                [
+                    "Re-record with full body visible (head to feet) and stable side/front camera angle.",
+                    "Keep required exercise joints in frame for the full set.",
+                    "Repeat the test while clearly performing the selected exercise reps.",
+                ]
+                if invalid_attempt
+                else self._build_recommendations(fault_counts, exercise_type)
+            ),
             "quality_flags": quality_flags,
             "usable_frame_rate": round(usable_rate, 3),
+            "invalid_attempt": invalid_attempt,
+            "invalid_reasons": invalid_reasons,
         }
 
         summary = {
