@@ -255,9 +255,40 @@ class GenericAngleRepAnalyzer:
         self.rep_breakdown: List[dict] = []
         self.fault_counts: Dict[str, int] = {}
         self.phase_scores = {"setup": [], "eccentric": [], "bottom": [], "concentric": [], "finish": []}
+        self._angle_history: List[float] = []
+        self._adaptive_ready = False
 
     def _add_fault(self, label: str):
         self.fault_counts[label] = self.fault_counts.get(label, 0) + 1
+
+    def _maybe_adapt_situp_thresholds(self, angle: float) -> None:
+        if self.name != "situp":
+            return
+
+        self._angle_history.append(angle)
+        if len(self._angle_history) > 180:
+            self._angle_history = self._angle_history[-180:]
+
+        # Calibrate once enough motion is observed to handle side-view videos.
+        if self._adaptive_ready or len(self._angle_history) < 24:
+            return
+
+        p_low = float(np.percentile(self._angle_history, 5))
+        p_high = float(np.percentile(self._angle_history, 95))
+        rom = p_high - p_low
+        if rom < 20:
+            return
+
+        down_thr = p_low + max(6.0, 0.20 * rom)
+        # Use a ROM-relative top target so partial-but-valid lockout still counts.
+        up_thr = p_low + max(14.0, 0.68 * rom)
+
+        down_thr = float(np.clip(down_thr, 95.0, 145.0))
+        up_thr = float(np.clip(up_thr, down_thr + 20.0, 178.0))
+
+        self.down_thr = down_thr
+        self.up_thr = up_thr
+        self._adaptive_ready = True
 
     def _angle_avg(self, kp: dict) -> Optional[float]:
         values = []
@@ -293,6 +324,7 @@ class GenericAngleRepAnalyzer:
         issues: List[str] = []
         score = 100.0
         body_err = self._body_line_error(kp)
+        self._maybe_adapt_situp_thresholds(angle)
         self.min_angle = min(self.min_angle, angle)
         self.max_angle = max(self.max_angle, angle)
 
@@ -623,7 +655,27 @@ class VideoProcessor:
             return base + ["left_knee", "right_knee"]
         return base
 
+    @staticmethod
+    def _invalid_capture_thresholds(exercise_type: str) -> Tuple[float, float]:
+        # Sit-up recordings are often side-angle; allow lower usable-frame ratio and
+        # higher partial-joint occlusion before marking the whole attempt invalid.
+        if exercise_type == ExerciseType.SITUP:
+            return 0.25, 0.70
+        return 0.35, 0.50
+
     def _exercise_joints_visible(self, keypoints: dict, exercise_type: str, min_vis: float = 0.45) -> bool:
+        if exercise_type == ExerciseType.SITUP:
+            left_chain = ("left_shoulder", "left_hip", "left_knee")
+            right_chain = ("right_shoulder", "right_hip", "right_knee")
+            left_ok = sum(1 for name in left_chain if keypoints.get(name, {}).get("visibility", 0) >= min_vis) >= 2
+            right_ok = sum(1 for name in right_chain if keypoints.get(name, {}).get("visibility", 0) >= min_vis) >= 2
+            core_ok = sum(
+                1
+                for name in ("left_shoulder", "right_shoulder", "left_hip", "right_hip")
+                if keypoints.get(name, {}).get("visibility", 0) >= min_vis
+            ) >= 2
+            return core_ok and (left_ok or right_ok)
+
         required = self._required_joints_for_exercise(exercise_type)
         if not required:
             return True
@@ -719,11 +771,14 @@ class VideoProcessor:
         if not cap.isOpened():
             raise ValueError(f"Cannot open video: {video_path}")
 
-        fps = cap.get(cv2.CAP_PROP_FPS) or 30
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        raw_fps = float(cap.get(cv2.CAP_PROP_FPS) or 0.0)
+        # Some WebM clips report corrupt FPS (e.g., 1000) which under-samples frames.
+        fps = raw_fps if 1.0 <= raw_fps <= 120.0 else 30.0
+        raw_total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        total_frames = raw_total_frames if raw_total_frames > 0 else 0
         fw = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         fh = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        duration = total_frames / fps if fps else 0.0
+        duration = total_frames / fps if total_frames > 0 and fps > 0 else 0.0
 
         analyzer = self.get_exercise_analyzer(exercise_type)
         cheat = CheatDetector()
@@ -812,11 +867,15 @@ class VideoProcessor:
                     )
                 )
 
-                if progress_callback:
+                if progress_callback and total_frames > 0:
                     progress_callback(frame_number / max(1, total_frames) * 100)
         finally:
             cap.release()
             pose.close()
+
+        # Fall back to observed video length when container metadata is invalid.
+        if duration <= 0.0 and frame_number > 0:
+            duration = frame_number / max(1.0, fps)
 
         cheat_report = cheat.report()
         total_reps = getattr(analyzer, "rep_count", 0)
@@ -853,9 +912,10 @@ class VideoProcessor:
         )
         if len(frame_scores) < 8:
             invalid_reasons.append("insufficient_pose_samples")
-        if usable_rate < 0.35:
+        min_usable_rate, max_low_joint_fraction = self._invalid_capture_thresholds(exercise_type)
+        if usable_rate < min_usable_rate:
             invalid_reasons.append("insufficient_usable_frames")
-        if len(frame_scores) > 0 and (low_joint_visibility_frames / len(frame_scores)) > 0.5:
+        if len(frame_scores) > 0 and (low_joint_visibility_frames / len(frame_scores)) > max_low_joint_fraction:
             invalid_reasons.append("exercise_joints_not_visible")
         if no_rep_ex and total_reps == 0 and usable_rate < 0.6:
             invalid_reasons.append("no_detectable_exercise_motion")

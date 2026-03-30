@@ -1,118 +1,11 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AthleteAI — Create Account</title>
+<title>AthleteAI - Create Account</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --bg: #04080f;
-    --surface: #080f1c;
-    --surface2: #0d1828;
-    --border: #162034;
-    --cyan: #00d4ff;
-    --purple: #8b5cf6;
-    --amber: #f59e0b;
-    --green: #10b981;
-    --red: #ef4444;
-    --text: #e8f0fe;
-    --muted: #5a7090;
-  }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: var(--bg); color: var(--text); font-family: 'Outfit', sans-serif; min-height: 100vh; display: flex; overflow-x: hidden; }
-
-  .bg-orbs { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
-  .orb { position: absolute; border-radius: 50%; filter: blur(90px); opacity: 0.12; animation: float 10s ease-in-out infinite; }
-  .orb1 { width: 600px; height: 600px; background: var(--purple); top: -200px; right: -100px; }
-  .orb2 { width: 400px; height: 400px; background: var(--cyan); bottom: -100px; left: 5%; animation-delay: 4s; }
-  .orb3 { width: 250px; height: 250px; background: var(--amber); top: 40%; left: 30%; animation-delay: 7s; }
-  @keyframes float { 0%,100%{transform:translate(0,0);} 50%{transform:translate(15px,-25px);} }
-  body::before { content:''; position:fixed; inset:0; background-image:linear-gradient(rgba(139,92,246,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(139,92,246,0.04) 1px,transparent 1px); background-size:50px 50px; pointer-events:none; z-index:0; }
-
-  /* LAYOUT */
-  .left-panel { width: 420px; min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding: 3rem; position: relative; z-index: 1; border-right: 1px solid var(--border); background: var(--surface); }
-  .right-panel { flex: 1; display: flex; align-items: center; justify-content: center; padding: 3rem; position: relative; z-index: 1; overflow-y: auto; }
-  .form-box { width: 100%; max-width: 520px; }
-
-  /* LEFT BRANDING */
-  .brand { font-family:'Bebas Neue',sans-serif; font-size:3.5rem; line-height:1; background:linear-gradient(135deg,var(--purple),var(--cyan)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:.75rem; }
-  .brand-sub { font-size:.9rem; color:var(--muted); line-height:1.7; margin-bottom:2.5rem; }
-
-  /* ROLE CARDS on left */
-  .role-preview-label { font-family:'JetBrains Mono',monospace; font-size:.65rem; color:var(--muted); text-transform:uppercase; letter-spacing:1.5px; margin-bottom:.75rem; }
-  .role-preview { display:flex; flex-direction:column; gap:.75rem; }
-  .role-card {
-    border:1px solid var(--border); border-radius:12px; padding:1rem 1.25rem;
-    display:flex; align-items:center; gap:.875rem; cursor:pointer;
-    transition:all .25s; background:var(--surface2);
-  }
-  .role-card:hover { border-color:rgba(255,255,255,.1); }
-  .role-card.athlete.active { border-color:var(--cyan); background:rgba(0,212,255,.05); box-shadow:0 0 20px rgba(0,212,255,.1); }
-  .role-card.admin.active   { border-color:var(--purple); background:rgba(139,92,246,.07); box-shadow:0 0 20px rgba(139,92,246,.15); }
-  .role-card-icon { font-size:1.5rem; width:40px; text-align:center; }
-  .role-card-info .role-name { font-weight:600; font-size:.95rem; }
-  .role-card-info .role-perms { font-size:.75rem; color:var(--muted); margin-top:.25rem; }
-  .role-card-info .role-perm { display:flex; align-items:center; gap:.35rem; margin-top:.2rem; }
-  .role-card-info .role-perm::before { content:'✓'; color:var(--green); font-size:.65rem; }
-  .role-card.athlete .role-name { color:var(--cyan); }
-  .role-card.admin   .role-name { color:var(--purple); }
-  .role-card .check-mark { margin-left:auto; font-size:1.2rem; opacity:0; transition:opacity .2s; }
-  .role-card.active .check-mark { opacity:1; }
-
-  /* FORM SIDE */
-  .form-header { margin-bottom:2rem; }
-  .role-indicator {
-    display:inline-flex; align-items:center; gap:.5rem;
-    padding:.35rem 1rem; border-radius:20px;
-    font-family:'JetBrains Mono',monospace; font-size:.7rem; font-weight:500;
-    margin-bottom:1rem; transition:all .3s;
-  }
-  .role-indicator.athlete { background:rgba(0,212,255,.1); color:var(--cyan); border:1px solid rgba(0,212,255,.3); }
-  .role-indicator.admin   { background:rgba(139,92,246,.12); color:var(--purple); border:1px solid rgba(139,92,246,.35); }
-  .ind-dot { width:6px; height:6px; border-radius:50%; background:currentColor; animation:blink 2s infinite; }
-  @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:.3;} }
-
-  .form-title { font-family:'Bebas Neue',sans-serif; font-size:2.2rem; letter-spacing:1px; margin-bottom:.25rem; }
-  .form-sub { font-size:.85rem; color:var(--muted); }
-
-  /* FORM FIELDS */
-  .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:.875rem; margin-bottom:.875rem; }
-  .form-group { margin-bottom:.875rem; }
-  .form-group.full { grid-column:1/-1; }
-  .form-group label { display:block; font-family:'JetBrains Mono',monospace; font-size:.67rem; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:.35rem; }
-  .form-group input {
-    width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:8px;
-    color:var(--text); font-family:'Outfit',sans-serif; font-size:.9rem; padding:.72rem 1rem;
-    transition:all .2s;
-  }
-  .form-group input:focus { outline:none; }
-  .form-group input.cyan-focus:focus { border-color:var(--cyan); box-shadow:0 0 0 3px rgba(0,212,255,.1); }
-  .form-group input.purple-focus:focus { border-color:var(--purple); box-shadow:0 0 0 3px rgba(139,92,246,.12); }
-
-  .section-divider { font-family:'JetBrains Mono',monospace; font-size:.65rem; color:var(--muted); text-transform:uppercase; letter-spacing:1.5px; margin:1.25rem 0 .875rem; padding-bottom:.5rem; border-bottom:1px solid var(--border); }
-
-  .submit-btn { width:100%; padding:.9rem; border-radius:10px; border:none; cursor:pointer; font-family:'Outfit',sans-serif; font-size:.95rem; font-weight:600; transition:all .25s; }
-  .submit-btn.athlete-btn { background:linear-gradient(135deg,#00d4ff,#0096b3); color:#000; }
-  .submit-btn.admin-btn   { background:linear-gradient(135deg,#8b5cf6,#5b21b6); color:#fff; }
-  .submit-btn:hover { transform:translateY(-2px); }
-  .submit-btn.athlete-btn:hover { box-shadow:0 8px 24px rgba(0,212,255,.3); }
-  .submit-btn.admin-btn:hover   { box-shadow:0 8px 24px rgba(139,92,246,.4); }
-
-  .form-footer { text-align:center; margin-top:1.25rem; font-size:.85rem; color:var(--muted); }
-  .form-footer a { color:var(--cyan); text-decoration:none; font-weight:500; }
-  .form-footer a:hover { text-decoration:underline; }
-  .form-footer a.admin-link { color:var(--purple); }
-  .form-footer a.authority-link { color:var(--amber); }
-  .role-card.authority.active { border-color:var(--amber); background:rgba(245,158,11,.06); box-shadow:0 0 20px rgba(245,158,11,.12); }
-  .role-card.authority .role-name { color:var(--amber); }
-  .role-indicator.authority { background:rgba(245,158,11,.1); color:var(--amber); border:1px solid rgba(245,158,11,.3); }
-  .submit-btn.authority-btn { background:linear-gradient(135deg,#f59e0b,#d97706); color:#000; }
-  .submit-btn.authority-btn:hover { box-shadow:0 8px 24px rgba(245,158,11,.35); }
-
-  .error-msg { background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.3); border-radius:8px; padding:.65rem 1rem; font-size:.82rem; color:var(--red); margin-bottom:1rem; display:none; }
-  .success-msg { background:rgba(16,185,129,.1); border:1px solid rgba(16,185,129,.3); border-radius:8px; padding:.65rem 1rem; font-size:.82rem; color:var(--green); margin-bottom:1rem; display:none; }
-</style>
+<link rel="stylesheet" href="styles/register.css">
 </head>
 <body>
 
@@ -122,16 +15,16 @@
   <div class="orb orb3"></div>
 </div>
 
-<!-- LEFT — ROLE SELECTOR -->
+<!-- LEFT - ROLE SELECTOR -->
 <div class="left-panel">
   <div class="brand">AthleteAI</div>
-  <p class="brand-sub">Join the platform. Choose your role — athletes track performance, authorities schedule assessments.</p>
+  <p class="brand-sub">Join the platform. Choose your role - athletes track performance, authorities schedule assessments.</p>
 
   <div class="role-preview-label">Select your role</div>
   <div class="role-preview">
 
     <div class="role-card athlete active" onclick="selectRole('athlete')">
-      <div class="role-card-icon">🏃</div>
+      <div class="role-card-icon">&#x1F3C3;</div>
       <div class="role-card-info">
         <div class="role-name">Athlete</div>
         <div class="role-perms">
@@ -140,11 +33,11 @@
           <div class="role-perm">Track personal progress</div>
         </div>
       </div>
-      <span class="check-mark">✅</span>
+      <span class="check-mark">&#10003;</span>
     </div>
 
     <div class="role-card authority" onclick="selectRole('authority')">
-      <div class="role-card-icon">🏛️</div>
+      <div class="role-card-icon">&#x1F3DB;&#xFE0F;</div>
       <div class="role-card-info">
         <div class="role-name">Sports Authority</div>
         <div class="role-perms">
@@ -153,13 +46,13 @@
           <div class="role-perm">Shortlist athletes</div>
         </div>
       </div>
-      <span class="check-mark">✅</span>
+      <span class="check-mark">&#10003;</span>
     </div>
 
   </div>
 </div>
 
-<!-- RIGHT — REGISTER FORM -->
+<!-- RIGHT - REGISTER FORM -->
 <div class="right-panel">
   <div class="form-box">
 
@@ -218,7 +111,7 @@
     </div>
 
     <button class="submit-btn athlete-btn" id="submit-btn" onclick="handleRegister()">
-      Create Athlete Account →
+      Create Athlete Account ->
     </button>
 
     <div class="form-footer" style="margin-top:1.25rem">
@@ -251,7 +144,7 @@ function selectRole(role) {
   const btnClasses = { athlete: 'athlete-btn', authority: 'authority-btn', admin: 'admin-btn' };
   const btn = document.getElementById('submit-btn');
   btn.className = 'submit-btn ' + (btnClasses[role] || 'athlete-btn');
-  btn.textContent = titles[role] + ' →';
+  btn.textContent = titles[role] + ' ->';
 
   document.getElementById('athlete-fields').style.display = role === 'athlete' ? 'block' : 'none';
 
@@ -336,10 +229,11 @@ async function handleRegister() {
     }
     showError(e.message);
     const titles = { athlete: 'Create Athlete Account', authority: 'Create Authority Account', admin: 'Create Admin Account' };
-    btn.textContent = (titles[selectedRole] || 'Create Account') + ' →';
+    btn.textContent = (titles[selectedRole] || 'Create Account') + ' ->';
     btn.disabled = false;
   }
 }
 </script>
 </body>
 </html>
+

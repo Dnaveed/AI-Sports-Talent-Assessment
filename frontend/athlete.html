@@ -6,146 +6,7 @@
 <title>AthleteAI — Athlete Dashboard</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='75' font-size='75' fill='%2300d4ff'>💪</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-  :root {
-    --bg:#04080f; --surface:#080f1c; --surface2:#0d1828; --surface3:#111f35;
-    --border:#162034; --cyan:#00d4ff; --purple:#8b5cf6; --amber:#f59e0b;
-    --green:#10b981; --red:#ef4444; --text:#e8f0fe; --muted:#5a7090;
-  }
-  *{margin:0;padding:0;box-sizing:border-box;}
-  body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;min-height:100vh;}
-  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,212,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,212,255,0.025) 1px,transparent 1px);background-size:50px 50px;pointer-events:none;z-index:0;}
-
-  /* NAV */
-  nav{position:sticky;top:0;z-index:100;background:rgba(4,8,15,0.92);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:.875rem 2rem;}
-  .nav-brand{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;background:linear-gradient(135deg,var(--cyan),var(--purple));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:1px;}
-  .nav-right{display:flex;align-items:center;gap:1rem;}
-  .nav-role-badge{display:flex;align-items:center;gap:.4rem;padding:.3rem .875rem;border-radius:20px;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.3);color:var(--cyan);font-family:'JetBrains Mono',monospace;font-size:.68rem;font-weight:500;}
-  .role-dot{width:6px;height:6px;border-radius:50%;background:var(--cyan);animation:pulse 2s infinite;}
-  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
-  .nav-user{display:flex;align-items:center;gap:.75rem;color:var(--muted);font-size:.875rem;}
-  .avatar{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),#0096b3);display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:.9rem;color:#000;}
-  .nav-btn{background:none;border:1px solid var(--border);color:var(--muted);font-family:'Outfit',sans-serif;font-size:.82rem;padding:.4rem 1rem;border-radius:6px;cursor:pointer;transition:all .2s;}
-  .nav-btn:hover{color:var(--text);border-color:var(--cyan);}
-
-  /* LAYOUT */
-  .layout{display:grid;grid-template-columns:200px 1fr;min-height:calc(100vh - 53px);position:relative;z-index:1;}
-  .sidebar{background:var(--surface);border-right:1px solid var(--border);padding:1.25rem 0;position:sticky;top:53px;height:calc(100vh - 53px);overflow-y:auto;}
-  .sidebar-label{font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;padding:.5rem .875rem;margin-bottom:.25rem;}
-  .sidebar-item{display:flex;align-items:center;gap:.75rem;padding:.6rem .875rem;margin:0 .5rem;border-radius:8px;color:var(--muted);cursor:pointer;transition:all .2s;font-size:.875rem;font-family:'Outfit',sans-serif;border:none;background:none;width:calc(100% - 1rem);text-align:left;}
-  .sidebar-item:hover{color:var(--text);background:var(--surface2);}
-  .sidebar-item.active{color:var(--cyan);background:rgba(0,212,255,.08);font-weight:500;}
-  .content{padding:2rem;overflow-y:auto;}
-  .page-title{font-family:'Bebas Neue',sans-serif;font-size:2rem;letter-spacing:1px;margin-bottom:.2rem;}
-  .page-sub{color:var(--muted);font-size:.875rem;margin-bottom:2rem;}
-
-  /* CARDS */
-  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;transition:border-color .2s;}
-  .card:hover{border-color:rgba(0,212,255,.2);}
-
-  /* STATS */
-  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:1rem;margin-bottom:2rem;}
-  .stat-card{text-align:center;padding:1.5rem 1rem;}
-  .stat-icon{font-size:1.75rem;margin-bottom:.5rem;}
-  .stat-val{font-family:'Bebas Neue',sans-serif;font-size:2.75rem;line-height:1;background:linear-gradient(135deg,var(--text),var(--cyan));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
-  .stat-label{font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-top:.25rem;}
-
-  /* BUTTONS */
-  .btn{display:inline-flex;align-items:center;justify-content:center;gap:.5rem;padding:.65rem 1.5rem;border-radius:8px;border:none;font-family:'Outfit',sans-serif;font-size:.875rem;font-weight:600;cursor:pointer;transition:all .2s;}
-  .btn-primary{background:linear-gradient(135deg,var(--cyan),#0096b3);color:#000;}
-  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,212,255,.3);}
-  .btn-ghost{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
-  .btn-ghost:hover{border-color:var(--cyan);}
-  .btn-sm{padding:.35rem .875rem;font-size:.78rem;border-radius:6px;}
-  .btn:disabled{opacity:.4;cursor:not-allowed;transform:none !important;}
-
-  /* TABLE */
-  .tbl{width:100%;border-collapse:collapse;}
-  .tbl th{text-align:left;padding:.7rem 1rem;font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);}
-  .tbl td{padding:.85rem 1rem;border-bottom:1px solid rgba(22,32,52,.7);font-size:.875rem;}
-  .tbl tr:hover td{background:var(--surface2);}
-
-  /* BADGES */
-  .badge{display:inline-block;padding:2px 10px;border-radius:20px;font-size:.7rem;font-weight:500;font-family:'JetBrains Mono',monospace;}
-  .badge-cyan{background:rgba(0,212,255,.1);color:var(--cyan);border:1px solid rgba(0,212,255,.25);}
-  .badge-green{background:rgba(16,185,129,.12);color:var(--green);border:1px solid rgba(16,185,129,.25);}
-  .badge-amber{background:rgba(245,158,11,.12);color:var(--amber);border:1px solid rgba(245,158,11,.25);}
-  .badge-red{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.25);}
-  .badge-purple{background:rgba(139,92,246,.12);color:var(--purple);border:1px solid rgba(139,92,246,.25);}
-
-  /* PROGRESS */
-  .prog-bar{height:5px;background:var(--surface3);border-radius:3px;overflow:hidden;}
-  .prog-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--cyan),var(--purple));}
-
-  /* UPLOAD */
-  .upload-zone{border:2px dashed var(--border);border-radius:12px;padding:2.5rem;text-align:center;cursor:pointer;transition:all .3s;position:relative;}
-  .upload-zone:hover,.upload-zone.over{border-color:var(--cyan);background:rgba(0,212,255,.03);}
-  .upload-zone input{position:absolute;inset:0;opacity:0;cursor:pointer;}
-
-  .exercise-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:.75rem;}
-  .ex-btn{background:var(--surface2);border:2px solid var(--border);border-radius:10px;padding:.875rem .75rem;text-align:center;cursor:pointer;transition:all .2s;}
-  .ex-btn:hover{border-color:rgba(0,212,255,.3);}
-  .ex-btn.selected{border-color:var(--cyan);background:rgba(0,212,255,.06);}
-  .ex-icon{font-size:1.75rem;margin-bottom:.4rem;}
-  .ex-name{font-size:.78rem;font-weight:600;color:var(--text);}
-
-  /* PROCESSING */
-  .overlay{position:fixed;inset:0;background:rgba(4,8,15,.92);z-index:200;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(12px);}
-  .proc-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:2.5rem;text-align:center;width:360px;}
-  .spinner{width:56px;height:56px;border-radius:50%;border:3px solid var(--border);border-top-color:var(--cyan);animation:spin 1s linear infinite;margin:0 auto 1.5rem;}
-  @keyframes spin{to{transform:rotate(360deg);}}
-  .proc-title{font-family:'Bebas Neue',sans-serif;font-size:1.5rem;letter-spacing:1px;margin-bottom:.4rem;}
-  .proc-step{color:var(--muted);font-size:.78rem;font-family:'JetBrains Mono',monospace;margin-bottom:1.5rem;}
-  .prog-bar-proc{height:4px;background:var(--surface2);border-radius:2px;overflow:hidden;margin-bottom:1rem;}
-  .prog-fill-proc{height:100%;background:linear-gradient(90deg,var(--purple),var(--cyan));border-radius:2px;transition:width .5s;}
-
-  /* RESULT */
-  .result-hero{background:linear-gradient(135deg,var(--surface2),var(--surface3));border:1px solid rgba(0,212,255,.2);border-radius:16px;padding:2rem;margin-bottom:1.5rem;position:relative;overflow:hidden;}
-  .result-hero::after{content:'';position:absolute;top:-40%;right:-5%;width:250px;height:250px;border-radius:50%;background:radial-gradient(circle,rgba(0,212,255,.08),transparent 70%);}
-  .result-grade{font-family:'Bebas Neue',sans-serif;font-size:5rem;line-height:1;background:linear-gradient(135deg,var(--cyan),var(--purple));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
-
-  /* SCORE RING */
-  .score-ring{position:relative;width:90px;height:90px;}
-  .score-ring svg{transform:rotate(-90deg);}
-  .ring-label{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:1.2rem;}
-  .ring-label small{font-size:.55rem;color:var(--muted);font-family:'JetBrains Mono',monospace;font-weight:400;text-transform:uppercase;}
-
-  /* FILTER ROW */
-  .filter-row{display:flex;gap:.75rem;flex-wrap:wrap;margin-bottom:1.5rem;align-items:center;}
-  .filter-row select,.filter-row input{background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.85rem;padding:.55rem .875rem;min-width:140px;}
-  .filter-row select:focus,.filter-row input:focus{outline:none;border-color:var(--cyan);}
-  select option{background:var(--surface2);}
-
-  .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;}
-  .section-title{font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:.5px;}
-  .hidden{display:none!important;}
-  .form-group{margin-bottom:1rem;}
-  .form-group label{display:block;font-family:'JetBrains Mono',monospace;font-size:.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:.35rem;}
-  .form-group input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.9rem;padding:.7rem 1rem;transition:all .2s;}
-  .form-group input:focus{outline:none;border-color:var(--cyan);box-shadow:0 0 0 3px rgba(0,212,255,.1);}
-  #toast-c{position:fixed;bottom:2rem;right:2rem;z-index:9999;display:flex;flex-direction:column;gap:.5rem;}
-  .toast{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.7rem 1rem;font-size:.85rem;min-width:260px;animation:tIn .3s ease;display:flex;align-items:center;gap:.5rem;}
-  .toast.ok{border-color:var(--green);}.toast.err{border-color:var(--red);}
-  @keyframes tIn{from{transform:translateX(80px);opacity:0;}}
-
-  .cheat-alert{background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:1rem 1.25rem;display:flex;gap:1rem;align-items:flex-start;margin-bottom:1.5rem;}
-  .instruction-step{display:flex;gap:1rem;align-items:flex-start;padding:.875rem 0;border-bottom:1px solid var(--border);}
-  .step-num{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--cyan),var(--purple));display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:.8rem;color:#000;flex-shrink:0;}
-
-  /* CAMERA STYLING */
-  #camera-preview{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:10px;background:#000}
-  .recording-indicator{display:inline-flex;align-items:center;gap:.5rem;padding:.4rem .8rem;border-radius:6px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);font-size:.75rem;color:var(--red);font-family:'JetBrains Mono',monospace;font-weight:500}
-  .recording-dot{width:6px;height:6px;border-radius:50%;background:var(--red);animation:pulse 1s infinite}
-
-  .video-modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(2,6,12,.8);backdrop-filter:blur(4px);z-index:1100;padding:1rem;}
-  .video-modal.open{display:flex;}
-  .video-card{width:min(900px,96vw);background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:0 20px 45px rgba(0,0,0,.45);overflow:hidden;}
-  .video-head{display:flex;justify-content:space-between;align-items:center;padding:.75rem .9rem;border-bottom:1px solid rgba(0,212,255,.16);}
-  .video-title{font-family:'Bebas Neue',sans-serif;font-size:1.05rem;letter-spacing:.6px;}
-  .video-body{padding:.85rem;}
-  .video-body video{width:100%;max-height:72vh;border-radius:8px;background:#000;}
-
-</style>
+<link rel="stylesheet" href="styles/athlete.css">
 </head>
 <body>
 
@@ -185,9 +46,9 @@
         <div class="card stat-card"><div class="stat-icon">📈</div><div class="stat-val" id="st-tests">—</div><div class="stat-label">Tests Done</div></div>
         <div class="card stat-card"><div class="stat-icon">🎯</div><div class="stat-val" id="st-level">—</div><div class="stat-label">My Level</div></div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
-        <div class="card"><div class="section-header"><span class="section-title">Form Score Trend</span><span style="font-size:.75rem;color:var(--muted)">Last 10 tests</span></div><canvas id="trend-chart" height="160"></canvas></div>
-        <div class="card"><div class="section-header"><span class="section-title">Exercise Mix</span></div><canvas id="dist-chart" height="160"></canvas></div>
+      <div class="dashboard-charts">
+        <div class="card chart-card"><div class="section-header"><span class="section-title">Form Score Trend</span><span style="font-size:.75rem;color:var(--muted)">Last 10 tests</span></div><canvas id="trend-chart" class="dashboard-chart"></canvas></div>
+        <div class="card chart-card"><div class="section-header"><span class="section-title">Exercise Mix</span></div><canvas id="dist-chart" class="dashboard-chart"></canvas></div>
       </div>
       <div class="card">
         <div class="section-header"><span class="section-title">Recent Tests</span><button class="btn btn-ghost btn-sm" onclick="showSec('history')">View All →</button></div>
@@ -524,8 +385,8 @@ function renderTrend(res) {
   const ctx = document.getElementById('trend-chart').getContext('2d');
   if (charts.trend) charts.trend.destroy();
   charts.trend = new Chart(ctx,{type:'line',data:{labels:res.map(r=>fmtDate(r.created_at)),
-    datasets:[{label:'Form',data:res.map(r=>r.avg_correctness_score),borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,.07)',tension:.4,fill:true,pointRadius:3}]},
-    options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#5a7090',font:{size:10}},grid:{color:'#162034'}},y:{ticks:{color:'#5a7090',font:{size:10}},grid:{color:'#162034'},min:0,max:100}}}});
+    datasets:[{label:'Form',data:res.map(r=>r.avg_correctness_score),borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,.07)',tension:.4,fill:true,pointRadius:2.5}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#5a7090',font:{size:10}},grid:{color:'#162034'}},y:{ticks:{color:'#5a7090',font:{size:10}},grid:{color:'#162034'},min:0,max:100}}}});
 }
 function renderDist(res) {
   const ctx = document.getElementById('dist-chart').getContext('2d');
@@ -533,7 +394,7 @@ function renderDist(res) {
   const c={};res.forEach(r=>c[r.exercise_type]=(c[r.exercise_type]||0)+1);
   charts.dist = new Chart(ctx,{type:'doughnut',data:{labels:Object.keys(c).map(fmtEx),
     datasets:[{data:Object.values(c),backgroundColor:['#00d4ff','#8b5cf6','#f59e0b','#10b981','#ef4444'],borderWidth:0}]},
-    options:{responsive:true,cutout:'65%',plugins:{legend:{labels:{color:'#5a7090',font:{size:10}}}}}});
+    options:{responsive:true,maintainAspectRatio:false,cutout:'72%',plugins:{legend:{labels:{color:'#5a7090',font:{size:10},boxWidth:10}}}}});
 }
 
 // ── Upload ─────────────────────────────────────────────────────────────────

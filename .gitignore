@@ -3,3 +3,6 @@ __pycache__/
 *.pyc
 .env
 node_modules/
+
+# Keep user-uploaded media private/local
+backend/uploads/
