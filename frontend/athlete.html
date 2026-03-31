@@ -474,7 +474,11 @@ async function startRecording() {
     selectedFile = file;
     
     document.getElementById('camera-file-info').classList.remove('hidden');
+<<<<<<< HEAD
     document.getElementById('camera-file-size').textContent = file.name + ' — ' + (blob.size/1024/1024).toFixed(1)+' MB';
+=======
+    document.getElementById('camera-file-size').textContent = (blob.size/1024/1024).toFixed(1)+' MB';
+>>>>>>> a7ad4593b4e3f7812a5f7108abf98b958f96dde2
     document.getElementById('submit-btn').disabled = false;
     toast('Video recorded and ready for analysis! ✓','ok');
   };
@@ -516,12 +520,16 @@ function stopRecording() {
 function clearCameraFile() {
   selectedFile = null;
   recordedChunks = [];
+<<<<<<< HEAD
   const input = document.getElementById('upload-input');
   if (input) input.value = '';
+=======
+>>>>>>> a7ad4593b4e3f7812a5f7108abf98b958f96dde2
   document.getElementById('camera-file-info').classList.add('hidden');
   document.getElementById('submit-btn').disabled = true;
 }
 
+<<<<<<< HEAD
 function handleFileUpload(inputEl) {
   const file = inputEl.files && inputEl.files[0];
   if (!file) return;
@@ -547,6 +555,8 @@ function handleFileUpload(inputEl) {
   document.getElementById('submit-btn').disabled = false;
 }
 
+=======
+>>>>>>> a7ad4593b4e3f7812a5f7108abf98b958f96dde2
 async function submitVideo() {
   if (!selectedFile) return;
   const ol=document.getElementById('proc-overlay'); ol.classList.remove('hidden');
