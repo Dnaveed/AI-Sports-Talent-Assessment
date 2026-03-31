@@ -1,0 +1,905 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AthleteAI — Athlete Dashboard</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='75' font-size='75' fill='%2300d4ff'>💪</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles/athlete.css">
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-brand">AthleteAI</div>
+  <div class="nav-right">
+    <div class="nav-role-badge"><span class="role-dot"></span>ATHLETE</div>
+    <div class="nav-user">
+      <div class="avatar" id="nav-avatar">?</div>
+      <span id="nav-name">Athlete</span>
+    </div>
+    <button class="nav-btn" onclick="logout()">Sign Out</button>
+  </div>
+</nav>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sidebar-label">Menu</div>
+    <button class="sidebar-item active" id="sn-dashboard" onclick="showSec('dashboard')">📊 Dashboard</button>
+    <button class="sidebar-item" id="sn-tests"     onclick="showSec('tests')">🏆 Assessments</button>
+    <button class="sidebar-item" id="sn-upload"    onclick="showSec('upload')">📤 New Test</button>
+    <button class="sidebar-item" id="sn-history"   onclick="showSec('history')">📋 My Results</button>
+    <button class="sidebar-item" id="sn-leaderboard" onclick="showSec('leaderboard')">🥇 Leaderboard</button>
+    <button class="sidebar-item" id="sn-profile"   onclick="showSec('profile')">👤 Profile</button>
+  </aside>
+
+  <main class="content">
+
+    <!-- DASHBOARD -->
+    <section id="sec-dashboard">
+      <div class="page-title">My Dashboard</div>
+      <p class="page-sub">Your fitness performance at a glance</p>
+      <div class="stats-grid">
+        <div class="card stat-card"><div class="stat-icon">🏅</div><div class="stat-val" id="st-reps">—</div><div class="stat-label">Best Reps</div></div>
+        <div class="card stat-card"><div class="stat-icon">⭐</div><div class="stat-val" id="st-score">—</div><div class="stat-label">Avg Form</div></div>
+        <div class="card stat-card"><div class="stat-icon">📈</div><div class="stat-val" id="st-tests">—</div><div class="stat-label">Tests Done</div></div>
+        <div class="card stat-card"><div class="stat-icon">🎯</div><div class="stat-val" id="st-level">—</div><div class="stat-label">My Level</div></div>
+      </div>
+      <div class="dashboard-charts">
+        <div class="card chart-card"><div class="section-header"><span class="section-title">Form Score Trend</span><span style="font-size:.75rem;color:var(--muted)">Last 10 tests</span></div><canvas id="trend-chart" class="dashboard-chart"></canvas></div>
+        <div class="card chart-card"><div class="section-header"><span class="section-title">Exercise Mix</span></div><canvas id="dist-chart" class="dashboard-chart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="section-header"><span class="section-title">Recent Tests</span><button class="btn btn-ghost btn-sm" onclick="showSec('history')">View All →</button></div>
+        <div id="recent-table"><div style="text-align:center;padding:2rem;color:var(--muted)">No tests yet. <a href="#" onclick="showSec('upload')" style="color:var(--cyan)">Upload your first video →</a></div></div>
+      </div>
+    </section>
+
+    <!-- UPLOAD -->
+    <section id="sec-upload" class="hidden">
+      <div class="page-title">New Fitness Test</div>
+      <p class="page-sub">Upload a video and let AI analyze your movement</p>
+      <div style="display:grid;grid-template-columns:1fr 320px;gap:1.5rem">
+        <div>
+          <div class="card" style="margin-bottom:1rem">
+            <div class="section-title" style="margin-bottom:1rem">1 — Choose Exercise</div>
+            <div class="exercise-grid">
+              <div class="ex-btn selected" data-ex="pushup" onclick="selectEx(this)"><div class="ex-icon">💪</div><div class="ex-name">Push-ups</div></div>
+              <div class="ex-btn" data-ex="squat" onclick="selectEx(this)"><div class="ex-icon">🏋️</div><div class="ex-name">Squats</div></div>
+              <div class="ex-btn" data-ex="vertical_jump" onclick="selectEx(this)"><div class="ex-icon">🦘</div><div class="ex-name">Vertical Jump</div></div>
+              <div class="ex-btn" data-ex="jumping_jack" onclick="selectEx(this)"><div class="ex-icon">⭐</div><div class="ex-name">Jumping Jacks</div></div>
+              <div class="ex-btn" data-ex="situp" onclick="selectEx(this)"><div class="ex-icon">🤸</div><div class="ex-name">Sit-ups</div></div>
+              <div class="ex-btn" data-ex="lunge" onclick="selectEx(this)"><div class="ex-icon">🚶</div><div class="ex-name">Lunges</div></div>
+            </div>
+          </div>
+          <div class="card" style="margin-bottom:1rem">
+            <div class="section-title" style="margin-bottom:1rem">2 — Record Video</div>
+            <!-- Camera Permission Request -->
+            <div id="camera-permission" style="background:linear-gradient(135deg,rgba(139,92,246,.1),rgba(0,212,255,.05));border:1px solid rgba(139,92,246,.3);border-radius:12px;padding:2rem;text-align:center;margin-bottom:1rem">
+              <div style="font-size:3rem;margin-bottom:1rem">🎥</div>
+              <div style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:.5px;margin-bottom:.5rem">Enable Camera Access</div>
+              <div style="font-size:.85rem;color:var(--muted);margin-bottom:1.5rem">Click below to allow camera access and start recording your exercise</div>
+              <button class="btn btn-primary" style="width:100%;padding:.8rem;font-size:.95rem" onclick="requestCameraAccess()">📹 Open Camera</button>
+            </div>
+
+            <!-- Camera Preview (hidden until permission granted) -->
+            <div id="camera-section" class="hidden">
+              <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:1rem">
+                <video id="camera-preview" style="width:100%;display:block;background:#000;border-radius:10px" autoplay playsinline></video>
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem">
+                <button class="btn btn-primary" id="record-btn" style="width:100%;padding:.8rem" onclick="startRecording()">⏺️ Start Recording</button>
+                <button class="btn btn-ghost" id="stop-btn" style="width:100%;padding:.8rem;display:none" onclick="stopRecording()">⏹️ Stop Recording</button>
+              </div>
+              <div id="recording-status" style="display:flex;align-items:center;gap:.5rem;font-size:.85rem;color:var(--amber);font-family:'JetBrains Mono',monospace;display:none">
+                <div style="width:8px;height:8px;border-radius:50%;background:var(--red);animation:pulse 1s infinite"></div>
+                <span id="recording-time">00:00</span>
+              </div>
+              <div id="camera-file-info" class="hidden" style="margin-top:1rem;background:var(--surface2);border:1px solid var(--green);border-radius:8px;padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between">
+                <div><div style="font-weight:500;font-size:.875rem;color:var(--green)">✓ Video ready</div><div style="font-size:.75rem;color:var(--muted)" id="camera-file-size"></div></div>
+                <button class="btn btn-ghost btn-sm" onclick="clearCameraFile()" style="color:var(--red)">✕ Clear</button>
+              </div>
+              <button class="btn btn-ghost" style="width:100%;padding:.6rem;font-size:.85rem;margin-top:.5rem" onclick="closeCameraAccess()">🔒 Close Camera</button>
+            </div>
+
+            <hr style="border:none;border-top:1px dashed var(--border);margin:1rem 0">
+            <div>
+              <div style="background:var(--surface2);border:1px dashed var(--border);border-radius:12px;padding:1rem;display:flex;flex-direction:column;gap:.6rem">
+                <div style="display:flex;align-items:center;gap:.5rem;font-size:.9rem;font-weight:500">
+                  <span style="font-size:1.1rem">📤</span>
+                  <span>Upload existing video</span>
+                </div>
+                <p style="font-size:.75rem;color:var(--muted);margin:0">MP4, MOV, WebM or AVI · up to 200MB</p>
+                <button type="button" class="btn btn-primary" style="padding:.65rem 1.2rem;font-size:.9rem;align-self:flex-start" onclick="document.getElementById('upload-input').click()">📁 Choose Video File</button>
+                <input type="file" id="upload-input" accept="video/mp4,video/webm,video/quicktime,video/x-msvideo" onchange="handleFileUpload(this)" style="display:none">
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-primary" style="width:100%;padding:1rem;font-size:1rem" id="submit-btn" onclick="submitVideo()" disabled>🚀 Analyze Video</button>
+        </div>
+        <div>
+          <div class="card" style="position:sticky;top:70px">
+            <div class="section-title" style="margin-bottom:.875rem">📋 Tips</div>
+            <div class="instruction-step"><div class="step-num">1</div><div><div style="font-weight:500;font-size:.85rem">Side view camera</div><div style="color:var(--muted);font-size:.75rem;margin-top:2px">3–6 ft away, full body visible</div></div></div>
+            <div class="instruction-step"><div class="step-num">2</div><div><div style="font-weight:500;font-size:.85rem">Good lighting</div><div style="color:var(--muted);font-size:.75rem;margin-top:2px">Avoid backlighting</div></div></div>
+            <div class="instruction-step"><div class="step-num">3</div><div><div style="font-weight:500;font-size:.85rem">Face visible</div><div style="color:var(--muted);font-size:.75rem;margin-top:2px">Required for identity check</div></div></div>
+            <div class="instruction-step" style="border:none"><div class="step-num">4</div><div><div style="font-weight:500;font-size:.85rem">10–120 seconds</div><div style="color:var(--muted);font-size:.75rem;margin-top:2px">Perform exercise naturally</div></div></div>
+            <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0">
+            <div style="font-size:.75rem;color:var(--muted);margin-bottom:.5rem;font-weight:500">AI detects:</div>
+            <div style="display:flex;flex-wrap:wrap;gap:.35rem">
+              <span class="badge badge-cyan">Rep Count</span>
+              <span class="badge badge-purple">Form Score</span>
+              <span class="badge badge-green">ROM</span>
+              <span class="badge badge-amber">Cheat Check</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HISTORY -->
+    <section id="sec-history" class="hidden">
+      <div class="page-title">My Results</div>
+      <p class="page-sub">All your past fitness test results</p>
+      <div class="filter-row">
+        <select id="f-exercise" onchange="loadHistory()"><option value="">All Exercises</option><option value="pushup">Push-ups</option><option value="squat">Squats</option><option value="vertical_jump">Vertical Jump</option><option value="jumping_jack">Jumping Jacks</option><option value="situp">Sit-ups</option></select>
+        <select id="f-level" onchange="loadHistory()"><option value="">All Levels</option><option>Advanced</option><option>Intermediate</option><option>Beginner</option></select>
+        <button class="btn btn-ghost btn-sm" onclick="loadHistory()">🔄 Refresh</button>
+      </div>
+      <div class="card">
+        <table class="tbl">
+          <thead><tr><th>Exercise</th><th>Date</th><th>Reps</th><th>Form Score</th><th>Level</th><th>Grade</th><th>Cheat?</th><th>Recording</th><th></th></tr></thead>
+          <tbody id="history-body"><tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ASSESSMENTS / TESTS -->
+    <section id="sec-tests" class="hidden">
+      <div class="page-title">Assessments</div>
+      <p class="page-sub">Scheduled fitness tests from sports authorities</p>
+      <div class="filter-row">
+        <select id="t-status-filter" onchange="loadTests()">
+          <option value="">All Tests</option>
+          <option value="upcoming">Upcoming</option>
+          <option value="active">Active Now</option>
+          <option value="completed">Completed</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="loadTests()">🔄 Refresh</button>
+      </div>
+      <div id="tests-list"><div style="text-align:center;padding:3rem;color:var(--muted)">Loading assessments...</div></div>
+    </section>
+
+    <!-- LEADERBOARD -->
+    <section id="sec-leaderboard" class="hidden">
+      <div class="page-title">Leaderboard</div>
+      <p class="page-sub">Athlete rankings for each assessment</p>
+      <div class="filter-row">
+        <select id="lb-test-select" onchange="loadLeaderboard()" style="min-width:260px">
+          <option value="">— Select an Assessment —</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="loadLeaderboard()">🔄 Refresh</button>
+      </div>
+      <div id="leaderboard-body"><div style="text-align:center;padding:3rem;color:var(--muted)">Select an assessment above to view rankings.</div></div>
+    </section>
+
+    <!-- RESULT DETAIL -->
+    <section id="sec-result" class="hidden">
+      <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem">
+        <button class="btn btn-ghost btn-sm" onclick="showSec('history')">← Back</button>
+        <div class="page-title" style="margin-bottom:0" id="result-title">Result</div>
+      </div>
+      <div id="result-body">Loading...</div>
+    </section>
+
+    <!-- PROFILE -->
+    <section id="sec-profile" class="hidden">
+      <div class="page-title">My Profile</div>
+      <p class="page-sub">Manage your account details</p>
+      <div style="max-width:480px">
+        <div class="card">
+          <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem">
+            <div class="avatar" style="width:52px;height:52px;font-size:1.1rem" id="p-avatar">?</div>
+            <div><div style="font-weight:600;font-size:1rem" id="p-name-show"></div><div style="color:var(--muted);font-size:.85rem" id="p-email-show"></div></div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.875rem">
+            <div class="form-group"><label>Full Name</label><input type="text" id="p-name"></div>
+            <div class="form-group"><label>Age</label><input type="number" id="p-age"></div>
+            <div class="form-group"><label>Height (cm)</label><input type="number" id="p-height"></div>
+            <div class="form-group"><label>Weight (kg)</label><input type="number" id="p-weight"></div>
+          </div>
+          <button class="btn btn-primary" onclick="saveProfile()">Save Changes</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- PROCESSING OVERLAY -->
+<div class="overlay hidden" id="proc-overlay">
+  <div class="proc-card">
+    <div class="spinner"></div>
+    <div class="proc-title">Analyzing Video</div>
+    <div class="proc-step" id="proc-step">Uploading...</div>
+    <div class="prog-bar-proc"><div class="prog-fill-proc" id="proc-prog" style="width:0%"></div></div>
+    <div style="color:var(--muted);font-size:.75rem">AI pose detection in progress</div>
+  </div>
+</div>
+
+<div id="toast-c"></div>
+
+<div id="history-video-modal" class="video-modal" onclick="closeHistoryVideo(event)">
+  <div class="video-card" onclick="event.stopPropagation()">
+    <div class="video-head">
+      <div id="history-video-title" class="video-title">Test Recording</div>
+      <button class="btn btn-ghost btn-sm" onclick="closeHistoryVideo()">✕ Close</button>
+    </div>
+    <div class="video-body">
+      <video id="history-video-player" controls playsinline preload="metadata"></video>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+const API = 'http://localhost:8000/api';
+const token = localStorage.getItem('token');
+const user  = JSON.parse(localStorage.getItem('user') || 'null');
+let selectedEx = 'pushup', selectedFile = null, charts = {};
+
+// Guard — redirect if not logged in or wrong role
+if (!token || !user) { window.location.href = 'login.html'; }
+else if (user.role === 'admin' || user.role === 'authority') { window.location.href = 'admin.html'; }
+else {
+  document.getElementById('nav-avatar').textContent = user.name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
+  document.getElementById('nav-name').textContent = user.name;
+  showSec('dashboard');
+}
+
+function logout() {
+  localStorage.removeItem('token'); localStorage.removeItem('user');
+  window.location.href = 'login.html';
+}
+
+async function api(method, path, body=null, isForm=false) {
+  const h = { Authorization: `Bearer ${token}` };
+  if (body && !isForm) h['Content-Type'] = 'application/json';
+  try {
+    const r = await fetch(`${API}${path}`, { method, headers: h, body: isForm ? body : (body ? JSON.stringify(body) : null) });
+    if (r.status === 401) { logout(); return null; }
+    if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.detail||`Error ${r.status}`); }
+    return await r.json();
+  } catch(e) {
+    if (e.message.includes('fetch')||e.message.includes('Failed')||e.message.includes('Network')) return demoFallback(method, path, body);
+    throw e;
+  }
+}
+
+// ── Demo data ──────────────────────────────────────────────────────────────
+function demoFallback(method, path, body) {
+  if (path==='/results') return mkResults();
+  if (path.includes('/sessions/upload')) return {session_id:'s1',job_id:'j1'};
+  if (path.includes('/jobs/')) return {status:'completed',progress:100};
+  if (path.includes('/result')) return mkDetail();
+  if (path.includes('/results/')) return mkDetail();
+  if (path==='/auth/me') return user;
+  if (path==='/profile') return {success:true};
+  if (path==='/tests') return mkDemoTests();
+  if (path.includes('/register') && method==='POST') return {success:true};
+  if (path.includes('/register') && method==='DELETE') return {success:true};
+  if (path.includes('/leaderboard')) return mkDemoLeaderboard();
+  return {};
+}
+function mkDemoTests() {
+  const exSets = [
+    [{type:'pushup',weight:0.5},{type:'situp',weight:0.5}],
+    [{type:'vertical_jump',weight:0.6},{type:'squat',weight:0.4}],
+    [{type:'jumping_jack',weight:0.4},{type:'lunge',weight:0.6}],
+  ];
+  return [
+    {id:'t1',name:'Football Fitness Test',sport:'Football',exercises:exSets[0],scheduled_date:'2026-03-20',start_time:'10:00',duration_minutes:60,description:'Annual football club selection test',status:'upcoming',participant_count:18,is_registered:false,created_by_name:'FC Academy'},
+    {id:'t2',name:'Athletics Selection Trial',sport:'Athletics',exercises:exSets[1],scheduled_date:'2026-03-15',start_time:'09:00',duration_minutes:90,description:'Sprint and jump assessments for track team',status:'active',participant_count:31,is_registered:true,created_by_name:'National Athletics Board'},
+    {id:'t3',name:'Basketball Tryouts',sport:'Basketball',exercises:exSets[2],scheduled_date:'2026-03-10',start_time:'14:00',duration_minutes:45,description:'City basketball league evaluation',status:'completed',participant_count:24,is_registered:false,created_by_name:'City Sports Club'},
+  ];
+}
+function mkDemoLeaderboard() {
+  const names=['Rahul Singh','Ahmed Al-Farsi','Priya Patel','John Smith','Emma Watson','Carlos Diaz'];
+  return names.map((name,i)=>({rank:i+1,user_id:'u'+i,name,score:94-i*4,form_grade:['A','A','B','B','C','C'][i],avg_correctness_score:91-i*3,total_reps:35-i*3,fitness_level:['Advanced','Advanced','Intermediate','Intermediate','Beginner','Beginner'][i],cheat_detected:false}));
+}
+function mkResults() {
+  const ex=['pushup','squat','vertical_jump','jumping_jack'], lv=['Beginner','Intermediate','Advanced'], gr=['A','B','C'];
+  return Array.from({length:8},(_,i)=>({
+    id:'r'+i, exercise_type:ex[i%4], total_reps:15+i*3,
+    avg_correctness_score:65+i*4, duration_seconds:30+i*2, reps_per_minute:30+i,
+    rule_score:63+i*4, ml_score:67+i*4, hybrid_form_score:65+i*4, confidence_score:72+i*2,
+    analysis_version:'v3.0-hybrid-rules',
+    fitness_level:lv[i%3], form_grade:gr[i%3], estimated_percentile:40+i*5,
+    jump_height_cm:i%4===2?42+i:null, cheat_detected:i===1?1:0, cheat_reasons:i===1?['Face hidden 60% of frames']:[],
+    created_at:new Date(Date.now()-i*86400000*3).toISOString(),
+    rep_breakdown:[{rep:1,quality_score:82,rom_percent:88,faults:[]},{rep:2,quality_score:78,rom_percent:80,faults:['insufficient_depth']}],
+    detailed_feedback:{
+      top_faults:[{type:'insufficient_depth',count:2,frequency_percent:25}],
+      phase_scores:{setup:85,eccentric:81,bottom:73,concentric:83,finish:86},
+      recommendations:['Increase depth on each rep before driving up.'],
+      quality_flags:[],
+      usable_frame_rate:.88
+    },
+    performance_metrics:{fitness_level:lv[i%3],form_grade:gr[i%3],estimated_percentile:40+i*5,
+      benchmarks:{beginner:10,intermediate:25,advanced:40},metric_value:15+i*3,metric_unit:'reps'}
+  }));
+}
+function mkDetail() {
+  return {id:'r0',exercise_type:'pushup',total_reps:28,avg_correctness_score:84.2,
+    rule_score:82.1,ml_score:87.3,hybrid_form_score:84.2,confidence_score:91.4,analysis_version:'v3.0-hybrid-rules',
+    duration_seconds:45,reps_per_minute:37,fitness_level:'Intermediate',form_grade:'B',
+    estimated_percentile:65,jump_height_cm:null,cheat_detected:0,cheat_reasons:[],
+    rep_breakdown:[
+      {rep:1,quality_score:83.2,rom_percent:86.0,faults:[]},
+      {rep:2,quality_score:79.1,rom_percent:78.5,faults:['insufficient_depth']},
+      {rep:3,quality_score:85.7,rom_percent:89.4,faults:[]}
+    ],
+    detailed_feedback:{
+      top_faults:[{type:'insufficient_depth',count:3,frequency_percent:18.8}],
+      phase_scores:{setup:89.2,eccentric:82.5,bottom:75.1,concentric:85.7,finish:90.1},
+      recommendations:['Drive slightly deeper before initiating the upward phase.','Maintain the same tempo across all reps.'],
+      quality_flags:['low_landmark_confidence'],
+      usable_frame_rate:0.83
+    },
+    created_at:new Date().toISOString(),
+    performance_metrics:{fitness_level:'Intermediate',form_grade:'B',estimated_percentile:65,
+      benchmarks:{beginner:10,intermediate:25,advanced:40},metric_value:28,metric_unit:'reps'}};
+}
+
+// ── Navigation ─────────────────────────────────────────────────────────────
+function showSec(s) {
+  document.querySelectorAll('[id^="sec-"]').forEach(el=>el.classList.add('hidden'));
+  document.getElementById('sec-'+s)?.classList.remove('hidden');
+  document.querySelectorAll('.sidebar-item').forEach(el=>el.classList.remove('active'));
+  document.getElementById('sn-'+s)?.classList.add('active');
+  if(s==='dashboard') loadDashboard();
+  else if(s==='history') loadHistory();
+  else if(s==='profile') loadProfile();
+  else if(s==='tests') loadTests();
+  else if(s==='leaderboard') { populateTestSelect(); loadLeaderboard(); }
+}
+
+// ── Dashboard ──────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  try {
+    const res = await api('GET','/results');
+    if (!res?.length) return;
+    document.getElementById('st-reps').textContent  = Math.max(...res.map(r=>r.total_reps));
+    document.getElementById('st-score').textContent = (res.reduce((s,r)=>s+r.avg_correctness_score,0)/res.length).toFixed(0)+'%';
+    document.getElementById('st-tests').textContent = res.length;
+    document.getElementById('st-level').textContent = res[0]?.fitness_level||'—';
+    renderRecent(res.slice(0,5));
+    renderTrend(res.slice(0,10).reverse());
+    renderDist(res);
+  } catch(e){console.error(e);}
+}
+
+function renderRecent(res) {
+  const c = document.getElementById('recent-table');
+  if (!res.length) return;
+  c.innerHTML = `<table class="tbl"><thead><tr><th>Exercise</th><th>Date</th><th>Reps</th><th>Form</th><th>Grade</th></tr></thead><tbody>
+    ${res.map(r=>`<tr>
+      <td>${icon(r.exercise_type)} ${fmtEx(r.exercise_type)}</td>
+      <td style="color:var(--muted)">${fmtDate(r.created_at)}</td>
+      <td><strong>${r.total_reps}</strong></td>
+      <td>${sBar(r.avg_correctness_score)}</td>
+      <td><span class="badge ${gCol(r.form_grade)}">${r.form_grade}</span></td>
+    </tr>`).join('')}
+  </tbody></table>`;
+}
+
+function renderTrend(res) {
+  const ctx = document.getElementById('trend-chart').getContext('2d');
+  if (charts.trend) charts.trend.destroy();
+  charts.trend = new Chart(ctx,{type:'line',data:{labels:res.map(r=>fmtDate(r.created_at)),
+    datasets:[{label:'Form',data:res.map(r=>r.avg_correctness_score),borderColor:'#00d4ff',backgroundColor:'rgba(0,212,255,.07)',tension:.4,fill:true,pointRadius:2.5}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#5a7090',font:{size:10}},grid:{color:'#162034'}},y:{ticks:{color:'#5a7090',font:{size:10}},grid:{color:'#162034'},min:0,max:100}}}});
+}
+function renderDist(res) {
+  const ctx = document.getElementById('dist-chart').getContext('2d');
+  if (charts.dist) charts.dist.destroy();
+  const c={};res.forEach(r=>c[r.exercise_type]=(c[r.exercise_type]||0)+1);
+  charts.dist = new Chart(ctx,{type:'doughnut',data:{labels:Object.keys(c).map(fmtEx),
+    datasets:[{data:Object.values(c),backgroundColor:['#00d4ff','#8b5cf6','#f59e0b','#10b981','#ef4444'],borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'72%',plugins:{legend:{labels:{color:'#5a7090',font:{size:10},boxWidth:10}}}}});
+}
+
+// ── Upload ─────────────────────────────────────────────────────────────────
+function selectEx(el) {
+  document.querySelectorAll('.ex-btn').forEach(b=>b.classList.remove('selected'));
+  el.classList.add('selected'); selectedEx = el.dataset.ex;
+}
+
+// ── Camera Recording ───────────────────────────────────────────────────────
+let mediaStream = null, mediaRecorder = null, recordedChunks = [];
+function requestCameraAccess() {
+  const permBtn = document.getElementById('camera-permission');
+  const camSec = document.getElementById('camera-section');
+  if (permBtn) permBtn.classList.add('hidden');
+  if (camSec) camSec.classList.remove('hidden');
+  startCameraPreview();
+}
+
+function closeCameraAccess() {
+  stopCameraPreview();
+  const permBtn = document.getElementById('camera-permission');
+  const camSec = document.getElementById('camera-section');
+  if (permBtn) permBtn.classList.remove('hidden');
+  if (camSec) camSec.classList.add('hidden');
+}
+
+
+async function startCameraPreview() {
+  try {
+    if (mediaStream) return;
+    mediaStream = await navigator.mediaDevices.getUserMedia({ 
+      video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: true 
+    });
+    const video = document.getElementById('camera-preview');
+    video.srcObject = mediaStream;
+    toast('Camera ready! Press "Start Recording"','ok');
+  } catch(e) {
+    toast(`Camera access denied: ${e.message}`,'err');
+    closeCameraAccess();
+  }
+}
+
+function stopCameraPreview() {
+  if (mediaStream) {
+    mediaStream.getTracks().forEach(track => track.stop());
+    mediaStream = null;
+  }
+}
+
+async function startRecording() {
+  if (!mediaStream) { toast('Camera not ready','err'); return; }
+  
+  recordedChunks = [];
+  mediaRecorder = new MediaRecorder(mediaStream, { mimeType: 'video/webm' });
+  
+  mediaRecorder.ondataavailable = (event) => {
+    if (event.data.size > 0) recordedChunks.push(event.data);
+  };
+  
+  mediaRecorder.onstop = () => {
+    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+    const file = new File([blob], `recording-${Date.now()}.webm`, { type: 'video/webm' });
+    selectedFile = file;
+    
+    document.getElementById('camera-file-info').classList.remove('hidden');
+    document.getElementById('camera-file-size').textContent = file.name + ' — ' + (blob.size/1024/1024).toFixed(1)+' MB';
+    document.getElementById('submit-btn').disabled = false;
+    toast('Video recorded and ready for analysis! ✓','ok');
+  };
+  
+  mediaRecorder.start();
+  let seconds = 0;
+  const timer = setInterval(() => {
+    seconds++;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    document.getElementById('recording-time').textContent = 
+      `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+    
+    // Warn if recording too long
+    if (seconds > 120) {
+      clearInterval(timer);
+      stopRecording();
+      toast('Recording limited to 120 seconds','err');
+    }
+  }, 1000);
+  
+  document.getElementById('record-btn').style.display = 'none';
+  document.getElementById('stop-btn').style.display = 'block';
+  document.getElementById('recording-status').style.display = 'flex';
+  mediaRecorder._timer = timer;
+}
+
+function stopRecording() {
+  if (!mediaRecorder || mediaRecorder.state === 'inactive') return;
+  
+  mediaRecorder.stop();
+  if (mediaRecorder._timer) clearInterval(mediaRecorder._timer);
+  
+  document.getElementById('record-btn').style.display = 'block';
+  document.getElementById('stop-btn').style.display = 'none';
+  document.getElementById('recording-status').style.display = 'none';
+}
+
+function clearCameraFile() {
+  selectedFile = null;
+  recordedChunks = [];
+  const input = document.getElementById('upload-input');
+  if (input) input.value = '';
+  document.getElementById('camera-file-info').classList.add('hidden');
+  document.getElementById('submit-btn').disabled = true;
+}
+
+function handleFileUpload(inputEl) {
+  const file = inputEl.files && inputEl.files[0];
+  if (!file) return;
+
+  const allowed = ['video/mp4','video/webm','video/quicktime','video/x-msvideo'];
+  if (file.type && !allowed.includes(file.type)) {
+    toast('Please select an MP4, MOV, WebM or AVI video','err');
+    inputEl.value = '';
+    return;
+  }
+  if (file.size > 200 * 1024 * 1024) {
+    toast('File too large (max 200MB)','err');
+    inputEl.value = '';
+    return;
+  }
+
+  selectedFile = file;
+  recordedChunks = [];
+  const info = document.getElementById('camera-file-info');
+  const sizeEl = document.getElementById('camera-file-size');
+  if (info) info.classList.remove('hidden');
+  if (sizeEl) sizeEl.textContent = `${file.name} — ${(file.size/1024/1024).toFixed(1)} MB`;
+  document.getElementById('submit-btn').disabled = false;
+}
+
+async function submitVideo() {
+  if (!selectedFile) return;
+  const ol=document.getElementById('proc-overlay'); ol.classList.remove('hidden');
+  const steps=['Uploading video...','Detecting keypoints...','Counting reps...','Scoring form...','Checking authenticity...','Building report...'];
+  let si=0; const sit=setInterval(()=>{ if(si<steps.length) document.getElementById('proc-step').textContent=steps[si++]; },2000);
+  const pf=document.getElementById('proc-prog'); let p=0;
+  const pit=setInterval(()=>{ p=Math.min(p+Math.random()*7,90); pf.style.width=p+'%'; },500);
+  try {
+    const form=new FormData(); form.append('file',selectedFile);
+    const testId = document.getElementById('submit-btn').dataset.testId || '';
+    const queryParams = `exercise_type=${selectedEx}${testId?`&test_id=${testId}`:''}`;
+    const sess=await api('POST',`/sessions/upload?${queryParams}`,form,true);
+    if (!sess) throw new Error('Upload failed');
+    let tries=0;
+    while(tries<30) {
+      await sleep(2000);
+      const job=await api('GET',`/jobs/${sess.job_id}`);
+      if(job?.status==='completed'){pf.style.width='100%';break;}
+      if(job?.status==='failed') throw new Error('Processing failed');
+      tries++;
+    }
+    clearInterval(sit); clearInterval(pit); ol.classList.add('hidden');
+    await sleep(200);
+    const result=await api('GET',`/sessions/${sess.session_id}/result`);
+    if(result) showResult(result);
+    toast('Analysis complete! 🎉','ok');
+    if (testId) { delete document.getElementById('submit-btn').dataset.testId; }
+  } catch(e){ clearInterval(sit); clearInterval(pit); ol.classList.add('hidden'); toast(e.message,'err'); }
+}
+
+// ── History ────────────────────────────────────────────────────────────────
+async function loadHistory() {
+  const tb=document.getElementById('history-body');
+  tb.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem">Loading...</td></tr>';
+  try {
+    let res=await api('GET','/results'); if(!res) return;
+    const ef=document.getElementById('f-exercise').value, lf=document.getElementById('f-level').value;
+    if(ef) res=res.filter(r=>r.exercise_type===ef);
+    if(lf) res=res.filter(r=>r.fitness_level===lf);
+    if(!res.length){tb.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem">No results found</td></tr>';return;}
+    tb.innerHTML=res.map(r=>`<tr>
+      <td>${icon(r.exercise_type)} ${fmtEx(r.exercise_type)}</td>
+      <td style="color:var(--muted)">${fmtDate(r.created_at)}</td>
+      <td><strong>${r.total_reps}</strong></td>
+      <td>${sBar(r.avg_correctness_score)}</td>
+      <td><span class="badge ${lCol(r.fitness_level)}">${r.fitness_level||'—'}</span></td>
+      <td><span class="badge ${gCol(r.form_grade)}">${r.form_grade||'—'}</span></td>
+      <td>${r.cheat_detected?'<span class="badge badge-red">⚠️ Flag</span>':'<span class="badge badge-green">✓</span>'}</td>
+      <td>${r.session_id?`<button class="btn btn-ghost btn-sm" onclick="openHistoryVideo('${r.session_id}','${fmtEx(r.exercise_type)}')">▶ Watch</button>`:'<span style="font-size:.74rem;color:var(--muted)">No video</span>'}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="loadResult('${r.id}')">View →</button></td>
+    </tr>`).join('');
+  } catch(e){tb.innerHTML=`<tr><td colspan="9" style="color:var(--red);text-align:center;padding:2rem">${e.message}</td></tr>`;}
+}
+
+let historyVideoObjectUrl = null;
+async function openHistoryVideo(sessionId, label) {
+  const modal = document.getElementById('history-video-modal');
+  const title = document.getElementById('history-video-title');
+  const player = document.getElementById('history-video-player');
+  if (!modal || !title || !player || !sessionId) return;
+
+  title.textContent = `Test Recording — ${label || 'Exercise'}`;
+  modal.classList.add('open');
+  player.removeAttribute('src');
+  player.load();
+
+  try {
+    const res = await fetch(`${API}/sessions/${sessionId}/video`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error(`Unable to load video (${res.status})`);
+    const blob = await res.blob();
+    if (historyVideoObjectUrl) URL.revokeObjectURL(historyVideoObjectUrl);
+    historyVideoObjectUrl = URL.createObjectURL(blob);
+    player.src = historyVideoObjectUrl;
+    await player.play().catch(()=>{});
+  } catch(e) {
+    closeHistoryVideo();
+    toast(e.message || 'Failed to load recording', 'err');
+  }
+}
+
+function closeHistoryVideo(evt) {
+  if (evt && evt.target && evt.target.id !== 'history-video-modal') return;
+  const modal = document.getElementById('history-video-modal');
+  const player = document.getElementById('history-video-player');
+  if (player) {
+    player.pause();
+    player.removeAttribute('src');
+    player.load();
+  }
+  if (historyVideoObjectUrl) {
+    URL.revokeObjectURL(historyVideoObjectUrl);
+    historyVideoObjectUrl = null;
+  }
+  modal?.classList.remove('open');
+}
+
+async function loadResult(id) {
+  document.querySelectorAll('[id^="sec-"]').forEach(el=>el.classList.add('hidden'));
+  document.getElementById('sec-result').classList.remove('hidden');
+  document.getElementById('result-body').innerHTML='<div style="text-align:center;padding:3rem;color:var(--muted)">Loading...</div>';
+  try { const r=await api('GET',`/results/${id}`); if(r) showResult(r); }
+  catch(e){ showResult(mkDetail()); }
+}
+
+function showResult(r) {
+  document.querySelectorAll('[id^="sec-"]').forEach(el=>el.classList.add('hidden'));
+  document.getElementById('sec-result').classList.remove('hidden');
+  document.getElementById('result-title').textContent=`${icon(r.exercise_type)} ${fmtEx(r.exercise_type)} Result`;
+  const pm=r.performance_metrics||{};
+  const df=r.detailed_feedback||{};
+  const topFaults=Array.isArray(df.top_faults)?df.top_faults:[];
+  const phaseScores=df.phase_scores||{};
+  const recs=Array.isArray(df.recommendations)?df.recommendations:[];
+  const repBreakdown=Array.isArray(r.rep_breakdown)?r.rep_breakdown.slice(0,10):[];
+  const modelVersion=r.analysis_version||r.summary?.analysis_version||'v2';
+  const confidenceScore=(r.confidence_score ?? 0);
+  const ruleScore=(r.rule_score ?? r.avg_correctness_score ?? 0);
+  const mlScore=(r.ml_score ?? r.avg_correctness_score ?? 0);
+  const hybridScore=(r.hybrid_form_score ?? r.avg_correctness_score ?? 0);
+  const durationSecRaw = Number(r.duration_seconds);
+  const durationSec = Number.isFinite(durationSecRaw) && durationSecRaw >= 0 && durationSecRaw < 36000 ? durationSecRaw : 0;
+  const metricValue = Number(pm.metric_value);
+  const safeMetricValue = Number.isFinite(metricValue) ? metricValue : (Number(r.total_reps) || 0);
+  const metricUnit = pm.metric_unit || 'reps';
+  document.getElementById('result-body').innerHTML=`
+    <div class="result-hero">
+      <div style="display:flex;gap:2rem;flex-wrap:wrap;align-items:flex-start">
+        <div><div style="font-size:.72rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase;margin-bottom:.5rem">Form Grade</div><div class="result-grade">${r.form_grade||'N/A'}</div></div>
+        <div style="flex:1;min-width:200px">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:1rem;margin-top:.25rem">
+            ${metricBox(r.total_reps,'Reps')}${metricBox(hybridScore?.toFixed(0)+'%','Hybrid Form')}${metricBox(confidenceScore?.toFixed(0)+'%','Confidence')}${metricBox(durationSec.toFixed(0)+'s','Duration')}${metricBox((pm.estimated_percentile||0)+'%ile','Percentile')}${r.jump_height_cm?metricBox(r.jump_height_cm+'cm','Jump Height'):''}
+          </div>
+          <div style="margin-top:1.25rem;display:flex;gap:.5rem;flex-wrap:wrap">
+            <span class="badge ${lCol(r.fitness_level)}">${r.fitness_level||'Unknown'}</span>
+            <span class="badge badge-cyan">${fmtEx(r.exercise_type)}</span>
+            <span class="badge badge-purple">${modelVersion}</span>
+            <span style="font-size:.75rem;color:var(--muted)">${fmtDate(r.created_at)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    ${r.cheat_detected?`<div class="cheat-alert"><div style="font-size:1.5rem">🚨</div><div><div style="font-weight:600;color:var(--red);margin-bottom:.25rem">Authenticity Warning</div><div style="font-size:.875rem;color:var(--muted)">${(r.cheat_reasons||[]).join('. ')||'Suspicious patterns detected.'}</div></div></div>`:''}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
+      <div class="card">
+        <div class="section-title" style="margin-bottom:1rem">vs Benchmarks</div>
+        ${pm.benchmarks?Object.entries(pm.benchmarks).map(([lvl,val])=>`<div style="margin-bottom:.75rem"><div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:4px"><span style="text-transform:capitalize">${lvl}</span><span style="color:var(--muted)">${val} ${metricUnit}</span></div><div class="prog-bar"><div class="prog-fill" style="width:${Math.min((safeMetricValue/val)*100,100)}%;background:${lvl==='advanced'?'var(--green)':lvl==='intermediate'?'var(--cyan)':'var(--amber)'}"></div></div></div>`).join('')+`<div style="font-size:.8rem;color:var(--muted);margin-top:.5rem">Your score: <strong style="color:var(--text)">${safeMetricValue} ${metricUnit}</strong></div>`
+        :'<div style="color:var(--muted)">No benchmark data</div>'}
+      </div>
+      <div class="card">
+        <div class="section-title" style="margin-bottom:1rem">Hybrid Form Analysis</div>
+        <div style="display:flex;justify-content:center;margin-bottom:1rem">${ringChart(hybridScore)}</div>
+        <div style="font-size:.8rem;text-align:center;color:var(--muted)">${hybridScore>=90?'🟢 Excellent form':hybridScore>=75?'🟡 Good, minor issues':hybridScore>=60?'🟠 Needs work':'🔴 Significant issues'}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.5rem;margin-top:1rem">
+          ${miniMetric(ruleScore,'Rule')}
+          ${miniMetric(mlScore,'ML')}
+          ${miniMetric(confidenceScore,'Conf')}
+        </div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
+      <div class="card">
+        <div class="section-title" style="margin-bottom:.9rem">Top Form Faults</div>
+        ${topFaults.length?`<div style="display:flex;flex-direction:column;gap:.6rem">${topFaults.map(f=>`<div style="display:flex;justify-content:space-between;gap:.75rem;font-size:.82rem"><span style="text-transform:capitalize">${String(f.type||'unknown').replaceAll('_',' ')}</span><span style="color:var(--muted)">${f.count||0}x (${f.frequency_percent||0}%)</span></div>`).join('')}</div>`:'<div style="color:var(--muted);font-size:.82rem">No major faults detected in this session.</div>'}
+        <div style="margin-top:1rem;padding-top:.8rem;border-top:1px solid var(--border)">
+          <div style="font-size:.68rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase;margin-bottom:.4rem">Phase Scores</div>
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.45rem">
+            ${phaseBadge('Setup', phaseScores.setup)}
+            ${phaseBadge('Eccentric', phaseScores.eccentric)}
+            ${phaseBadge('Bottom', phaseScores.bottom)}
+            ${phaseBadge('Concentric', phaseScores.concentric)}
+            ${phaseBadge('Finish', phaseScores.finish)}
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="section-title" style="margin-bottom:.9rem">Defining Recommendations</div>
+        ${recs.length?`<div style="display:flex;flex-direction:column;gap:.55rem">${recs.map((x,i)=>`<div style="font-size:.82rem;color:var(--text)">${i+1}. ${x}</div>`).join('')}</div>`:'<div style="font-size:.82rem;color:var(--muted)">Maintain your current mechanics and consistency.</div>'}
+        <div style="margin-top:1rem;padding-top:.8rem;border-top:1px solid var(--border)">
+          <div style="font-size:.68rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase;margin-bottom:.45rem">Quality Flags</div>
+          ${(df.quality_flags||[]).length?`<div style="display:flex;gap:.35rem;flex-wrap:wrap">${(df.quality_flags||[]).map(f=>`<span class="badge badge-amber">${String(f).replaceAll('_',' ')}</span>`).join('')}</div>`:'<span class="badge badge-green">clean capture</span>'}
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:1.5rem">
+      <div class="section-title" style="margin-bottom:.9rem">Per-Rep Breakdown</div>
+      ${repBreakdown.length?`<table class="tbl"><thead><tr><th>Rep</th><th>Quality</th><th>ROM/Jump</th><th>Faults</th></tr></thead><tbody>${repBreakdown.map(rep=>`<tr><td><strong>${rep.rep||'-'}</strong></td><td>${(rep.quality_score??0).toFixed(1)}%</td><td>${rep.rom_percent!=null?`${rep.rom_percent}% ROM`:(rep.jump_height_cm!=null?`${rep.jump_height_cm} cm`:'—')}</td><td style="color:var(--muted)">${(rep.faults||[]).length?(rep.faults||[]).map(f=>String(f).replaceAll('_',' ')).join(', '):'Clean rep'}</td></tr>`).join('')}</tbody></table>`:'<div style="color:var(--muted);font-size:.82rem">Rep breakdown unavailable for this recording.</div>'}
+    </div>
+    <div style="display:flex;gap:.75rem">
+      <button class="btn btn-primary" onclick="showSec('upload')">📹 New Test</button>
+      <button class="btn btn-ghost" onclick="showSec('history')">← All Results</button>
+    </div>`;
+}
+
+function metricBox(val,label){return`<div><div style="font-family:'Bebas Neue',sans-serif;font-size:1.75rem;line-height:1">${val}</div><div style="font-size:.65rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase;margin-top:3px">${label}</div></div>`;}
+function miniMetric(v,label){return`<div style="text-align:center;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:.45rem .35rem"><div style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;line-height:1">${(v??0).toFixed(0)}%</div><div style="font-size:.58rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase;margin-top:2px">${label}</div></div>`;}
+function phaseBadge(label,val){const score=(val??0);const color=score>=85?'badge-green':score>=70?'badge-cyan':score>=55?'badge-amber':'badge-red';return`<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:.74rem;color:var(--muted)">${label}</span><span class="badge ${color}">${score?score.toFixed(0):'--'}%</span></div>`;}
+
+// ── Profile ────────────────────────────────────────────────────────────────
+async function loadProfile() {
+  try {
+    const u=await api('GET','/auth/me')||user;
+    const ini=u.name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
+    document.getElementById('p-avatar').textContent=ini;
+    document.getElementById('p-name-show').textContent=u.name;
+    document.getElementById('p-email-show').textContent=u.email;
+    document.getElementById('p-name').value=u.name||'';
+    document.getElementById('p-age').value=u.age||'';
+    document.getElementById('p-height').value=u.height_cm||'';
+    document.getElementById('p-weight').value=u.weight_kg||'';
+  }catch(e){console.error(e);}
+}
+async function saveProfile() {
+  try {
+    await api('PUT','/profile',{name:document.getElementById('p-name').value||null,age:parseInt(document.getElementById('p-age').value)||null,height_cm:parseFloat(document.getElementById('p-height').value)||null,weight_kg:parseFloat(document.getElementById('p-weight').value)||null});
+    toast('Profile updated!','ok');
+  }catch(e){toast(e.message,'err');}
+}
+
+// ── Assessments ────────────────────────────────────────────────────────────
+async function loadTests() {
+  const container = document.getElementById('tests-list');
+  container.innerHTML = '<div style="text-align:center;padding:3rem;color:var(--muted)">Loading...</div>';
+  try {
+    const statusFilter = document.getElementById('t-status-filter').value;
+    const url = statusFilter ? `/tests?status=${statusFilter}` : '/tests';
+    const tests = await api('GET', url);
+    if (!tests?.length) {
+      container.innerHTML = '<div style="text-align:center;padding:3rem;color:var(--muted)">No assessments found.</div>';
+      return;
+    }
+    container.innerHTML = tests.map(t => {
+      const statusBadge = {upcoming:'badge-amber',active:'badge-green',completed:'badge-purple'}[t.status] || 'badge-cyan';
+      const exList = (t.exercises||[]).map(e=>fmtEx(e.type||e)).join(', ');
+      const isActive = t.status==='active';
+      const isUpcoming = t.status==='upcoming';
+      const isDone = t.status==='completed';
+      return `<div class="card" style="margin-bottom:1rem;border-color:${isActive?'rgba(16,185,129,.3)':''}" >
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:.75rem">
+          <div style="flex:1;min-width:200px">
+            <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.35rem">
+              <span style="font-family:'Bebas Neue',sans-serif;font-size:1.15rem;letter-spacing:.5px">${t.name}</span>
+              <span class="badge ${statusBadge}" style="font-size:.6rem">${t.status.toUpperCase()}</span>
+              ${t.is_registered?'<span class="badge badge-cyan" style="font-size:.6rem">✓ REGISTERED</span>':''}
+            </div>
+            <div style="font-size:.8rem;color:var(--muted);margin-bottom:.6rem">
+              <span style="margin-right:.75rem">🏅 ${t.sport||'General'}</span>
+              <span style="margin-right:.75rem">📅 ${t.scheduled_date} at ${t.start_time}</span>
+              <span style="margin-right:.75rem">⏱ ${t.duration_minutes} min</span>
+              <span>👥 ${t.participant_count||0} participants</span>
+            </div>
+            ${t.description?`<div style="font-size:.8rem;color:var(--muted);margin-bottom:.6rem">${t.description}</div>`:''}
+            <div style="font-size:.75rem;color:var(--muted)">
+              <span style="font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.5px;font-size:.62rem">Exercises:</span>
+              <span style="margin-left:.35rem">${exList||'TBD'}</span>
+            </div>
+            ${t.created_by_name?`<div style="font-size:.72rem;color:var(--muted);margin-top:.25rem">By: ${t.created_by_name}</div>`:''}
+          </div>
+          <div style="display:flex;flex-direction:column;gap:.5rem;min-width:140px;align-items:flex-end">
+            ${isActive?`<button class="btn btn-primary btn-sm" onclick="joinTest('${t.id}','${(t.exercises||[{}])[0]?.type||'pushup'}')">🎥 Join & Record</button>`:''}
+            ${isUpcoming && !t.is_registered?`<button class="btn btn-ghost btn-sm" onclick="registerForTest('${t.id}',this)">📝 Register</button>`:''}
+            ${isUpcoming && t.is_registered?`<button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:var(--red)" onclick="unregisterFromTest('${t.id}',this)">✕ Unregister</button>`:''}
+            ${isDone?`<button class="btn btn-ghost btn-sm" onclick="document.getElementById('lb-test-select').value='${t.id}';showSec('leaderboard')">🏆 View Results</button>`:''}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    container.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--red)">${e.message}</div>`;
+  }
+}
+
+async function registerForTest(testId, btn) {
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    await api('POST', `/tests/${testId}/register`);
+    toast('Registered for assessment! ✅','ok'); loadTests();
+  } catch(e) { toast(e.message,'err'); btn.disabled=false; btn.textContent='📝 Register'; }
+}
+
+async function unregisterFromTest(testId, btn) {
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    await api('DELETE', `/tests/${testId}/register`);
+    toast('Unregistered.','ok'); loadTests();
+  } catch(e) { toast(e.message,'err'); btn.disabled=false; btn.textContent='✕ Unregister'; }
+}
+
+function joinTest(testId, exerciseType) {
+  showSec('upload');
+  // Pre-select the exercise matching the test
+  document.querySelectorAll('.ex-btn').forEach(b=>b.classList.remove('selected'));
+  const target = document.querySelector(`[data-ex="${exerciseType}"]`);
+  if (target) { target.classList.add('selected'); selectedEx = exerciseType; }
+  document.getElementById('submit-btn').dataset.testId = testId;
+  toast(`Recording for assessment — exercise: ${fmtEx(exerciseType)}`,'ok');
+}
+
+// ── Leaderboard ─────────────────────────────────────────────────────────────
+async function populateTestSelect() {
+  try {
+    const tests = await api('GET', '/tests');
+    const sel = document.getElementById('lb-test-select');
+    const current = sel.value;
+    sel.innerHTML = '<option value="">— Select an Assessment —</option>';
+    (tests||[]).forEach(t => {
+      const opt = document.createElement('option');
+      opt.value = t.id; opt.textContent = `${t.name} (${t.sport||'General'}) — ${t.status}`;
+      sel.appendChild(opt);
+    });
+    if (current) sel.value = current;
+  } catch(e) { console.error(e); }
+}
+
+async function loadLeaderboard() {
+  const testId = document.getElementById('lb-test-select').value;
+  const body = document.getElementById('leaderboard-body');
+  if (!testId) { body.innerHTML = '<div style="text-align:center;padding:3rem;color:var(--muted)">Select an assessment above to view rankings.</div>'; return; }
+  body.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted)">Loading...</div>';
+  try {
+    const entries = await api('GET', `/tests/${testId}/leaderboard`);
+    if (!entries?.length) { body.innerHTML = '<div class="card" style="text-align:center;padding:2rem;color:var(--muted)">No results submitted yet.</div>'; return; }
+    const myId = user?.id;
+    body.innerHTML = `<div class="card"><table class="tbl">
+      <thead><tr><th>Rank</th><th>Athlete</th><th>Score</th><th>Grade</th><th>Reps</th><th>Form</th><th>Level</th><th>Status</th></tr></thead>
+      <tbody>${entries.map(e=>{
+        const isMe = e.user_id===myId;
+        const medal = e.rank===1?'🥇':e.rank===2?'🥈':e.rank===3?'🥉':'';
+        return `<tr style="${isMe?'background:rgba(0,212,255,.05);':''}">
+          <td><strong style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem">${medal}${e.rank}</strong></td>
+          <td><div style="font-weight:600">${e.name}${isMe?' <span class="badge badge-cyan" style="font-size:.58rem">YOU</span>':''}</div></td>
+          <td><strong style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;color:var(--cyan)">${e.score}</strong><span style="font-size:.7rem;color:var(--muted)">/100</span></td>
+          <td><span class="badge ${gCol(e.form_grade)}">${e.form_grade||'—'}</span></td>
+          <td>${e.total_reps||'—'}</td>
+          <td>${sBar(e.avg_correctness_score)}</td>
+          <td><span class="badge ${lCol(e.fitness_level)}">${e.fitness_level||'—'}</span></td>
+          <td>${e.cheat_detected?'<span class="badge badge-red">⚠️ Flagged</span>':'<span class="badge badge-green">✓ Clean</span>'}</td>
+        </tr>`;
+      }).join('')}</tbody></table></div>`;
+  } catch(e) { body.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--red)">${e.message}</div>`; }
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function icon(t){return{pushup:'💪',squat:'🏋️',vertical_jump:'🦘',jumping_jack:'⭐',situp:'🤸',lunge:'🚶'}[t]||'🏃';}
+function fmtEx(t){return{pushup:'Push-ups',squat:'Squats',vertical_jump:'Vertical Jump',jumping_jack:'Jumping Jacks',situp:'Sit-ups',lunge:'Lunges'}[t]||t;}
+function fmtDate(d){if(!d)return'—';return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+function sBar(s){const c=s>=80?'var(--green)':s>=60?'var(--amber)':'var(--red)';return`<div style="display:flex;align-items:center;gap:.5rem"><div class="prog-bar" style="width:65px"><div class="prog-fill" style="width:${s?.toFixed(0)||0}%;background:${c}"></div></div><span style="font-size:.75rem;color:var(--muted)">${s?.toFixed(0)||0}%</span></div>`;}
+function ringChart(s){const r=35,c=2*Math.PI*r,f=(s/100)*c,col=s>=80?'#10b981':s>=60?'#f59e0b':'#ef4444';return`<div class="score-ring"><svg width="90" height="90" viewBox="0 0 90 90"><circle cx="45" cy="45" r="${r}" fill="none" stroke="#162034" stroke-width="6"/><circle cx="45" cy="45" r="${r}" fill="none" stroke="${col}" stroke-width="6" stroke-dasharray="${f} ${c}" stroke-linecap="round"/></svg><div class="ring-label">${s?.toFixed(0)}<small>FORM</small></div></div>`;}
+function lCol(l){return{Advanced:'badge-green',Intermediate:'badge-cyan',Beginner:'badge-amber','Needs Work':'badge-red'}[l]||'badge-amber';}
+function gCol(g){return'AB'.includes(g)?'badge-green':g==='C'?'badge-amber':'badge-red';}
+function toast(msg,type='ok'){const el=document.createElement('div');el.className=`toast ${type}`;el.innerHTML=`${type==='ok'?'✅':'❌'} ${msg}`;document.getElementById('toast-c').appendChild(el);setTimeout(()=>el.remove(),4000);}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+</script>
+</body>
+</html>

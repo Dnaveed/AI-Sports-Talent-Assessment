@@ -1,0 +1,239 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AthleteAI - Create Account</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles/register.css">
+</head>
+<body>
+
+<div class="bg-orbs">
+  <div class="orb orb1"></div>
+  <div class="orb orb2"></div>
+  <div class="orb orb3"></div>
+</div>
+
+<!-- LEFT - ROLE SELECTOR -->
+<div class="left-panel">
+  <div class="brand">AthleteAI</div>
+  <p class="brand-sub">Join the platform. Choose your role - athletes track performance, authorities schedule assessments.</p>
+
+  <div class="role-preview-label">Select your role</div>
+  <div class="role-preview">
+
+    <div class="role-card athlete active" onclick="selectRole('athlete')">
+      <div class="role-card-icon">&#x1F3C3;</div>
+      <div class="role-card-info">
+        <div class="role-name">Athlete</div>
+        <div class="role-perms">
+          <div class="role-perm">Join scheduled assessments</div>
+          <div class="role-perm">View AI analysis & scores</div>
+          <div class="role-perm">Track personal progress</div>
+        </div>
+      </div>
+      <span class="check-mark">&#10003;</span>
+    </div>
+
+    <div class="role-card authority" onclick="selectRole('authority')">
+      <div class="role-card-icon">&#x1F3DB;&#xFE0F;</div>
+      <div class="role-card-info">
+        <div class="role-name">Sports Authority</div>
+        <div class="role-perms">
+          <div class="role-perm">Create & schedule tests</div>
+          <div class="role-perm">View leaderboards</div>
+          <div class="role-perm">Shortlist athletes</div>
+        </div>
+      </div>
+      <span class="check-mark">&#10003;</span>
+    </div>
+
+  </div>
+</div>
+
+<!-- RIGHT - REGISTER FORM -->
+<div class="right-panel">
+  <div class="form-box">
+
+    <div class="form-header">
+      <div class="role-indicator athlete" id="role-indicator">
+        <span class="ind-dot"></span>
+        <span id="indicator-text">ATHLETE REGISTRATION</span>
+      </div>
+      <div class="form-title" id="form-title">Create Athlete Account</div>
+      <p class="form-sub" id="form-sub">Fill in your details to get started</p>
+    </div>
+
+    <div class="error-msg" id="error-msg"></div>
+    <div class="success-msg" id="success-msg"></div>
+
+    <div class="section-divider">Personal Information</div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Full Name *</label>
+        <input type="text" id="name" placeholder="John Doe" class="cyan-focus">
+      </div>
+      <div class="form-group">
+        <label>Age</label>
+        <input type="number" id="age" placeholder="25" min="10" max="100" class="cyan-focus">
+      </div>
+    </div>
+
+    <!-- Athlete-only fields -->
+    <div id="athlete-fields">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Height (cm)</label>
+          <input type="number" id="height" placeholder="175" class="cyan-focus">
+        </div>
+        <div class="form-group">
+          <label>Weight (kg)</label>
+          <input type="number" id="weight" placeholder="70" class="cyan-focus">
+        </div>
+      </div>
+    </div>
+
+    <div class="section-divider">Account Credentials</div>
+    <div class="form-group">
+      <label>Email Address *</label>
+      <input type="email" id="email" placeholder="you@example.com" class="cyan-focus">
+    </div>
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Password *</label>
+        <input type="password" id="password" placeholder="Min 8 characters" class="cyan-focus">
+      </div>
+      <div class="form-group">
+        <label>Confirm Password *</label>
+        <input type="password" id="confirm-password" placeholder="Repeat password" class="cyan-focus">
+      </div>
+    </div>
+
+    <button class="submit-btn athlete-btn" id="submit-btn" onclick="handleRegister()">
+      Create Athlete Account ->
+    </button>
+
+    <div class="form-footer" style="margin-top:1.25rem">
+      Already have an account? <a href="login.html" id="login-link">Sign in here</a>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const API = 'http://localhost:8000/api';
+let selectedRole = 'athlete';
+
+function selectRole(role) {
+  selectedRole = role;
+
+  document.querySelectorAll('.role-card').forEach(c => c.classList.remove('active'));
+  document.querySelector('.role-card.' + role).classList.add('active');
+
+  const ind = document.getElementById('role-indicator');
+  ind.className = 'role-indicator ' + role;
+  const labels = { athlete: 'ATHLETE REGISTRATION', authority: 'AUTHORITY REGISTRATION', admin: 'ADMIN REGISTRATION' };
+  document.getElementById('indicator-text').textContent = labels[role] || 'REGISTRATION';
+
+  const titles = { athlete: 'Create Athlete Account', authority: 'Create Authority Account', admin: 'Create Admin Account' };
+  const subs   = { athlete: 'Fill in your details to get started', authority: 'Register your sports organization', admin: 'Set up your administrator account' };
+  document.getElementById('form-title').textContent = titles[role];
+  document.getElementById('form-sub').textContent   = subs[role];
+
+  const btnClasses = { athlete: 'athlete-btn', authority: 'authority-btn', admin: 'admin-btn' };
+  const btn = document.getElementById('submit-btn');
+  btn.className = 'submit-btn ' + (btnClasses[role] || 'athlete-btn');
+  btn.textContent = titles[role] + ' ->';
+
+  document.getElementById('athlete-fields').style.display = role === 'athlete' ? 'block' : 'none';
+
+  const focusClasses = { athlete: 'cyan-focus', authority: 'amber-focus', admin: 'purple-focus' };
+  const focusClass = focusClasses[role] || 'cyan-focus';
+  document.querySelectorAll('input').forEach(i => { i.className = focusClass; });
+
+  const linkClasses = { authority: 'authority-link', admin: 'admin-link' };
+  document.getElementById('login-link').className = linkClasses[role] || '';
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = msg; el.style.display = 'block';
+  document.getElementById('success-msg').style.display = 'none';
+}
+function showSuccess(msg) {
+  const el = document.getElementById('success-msg');
+  el.textContent = msg; el.style.display = 'block';
+  document.getElementById('error-msg').style.display = 'none';
+}
+
+async function handleRegister() {
+  const name     = document.getElementById('name').value.trim();
+  const email    = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const confirm  = document.getElementById('confirm-password').value;
+
+  if (!name)           return showError('Full name is required');
+  if (!email)          return showError('Email address is required');
+  if (!password)       return showError('Password is required');
+  if (password.length < 8) return showError('Password must be at least 8 characters');
+  if (password !== confirm) return showError('Passwords do not match');
+
+  const btn = document.getElementById('submit-btn');
+  btn.textContent = 'Creating account...'; btn.disabled = true;
+
+  const payload = {
+    name, email, password, role: selectedRole,
+    age:       parseInt(document.getElementById('age').value) || null,
+    height_cm: parseFloat(document.getElementById('height')?.value) || null,
+    weight_kg: parseFloat(document.getElementById('weight')?.value) || null,
+  };
+
+  // Admin accounts use local override only (not registerable via public form in prod)
+  if (selectedRole === 'admin') {
+    payload.role = 'athlete'; // admin seeded server-side; treat as athlete on server
+  }
+
+  try {
+    const res = await fetch(`${API}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Registration failed');
+    }
+
+    const data = await res.json();
+    const finalRole = selectedRole === 'admin' ? 'admin' : data.user.role;
+    const user = { ...data.user, role: finalRole };
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('user', JSON.stringify(user));
+
+    showSuccess('Account created! Redirecting...');
+    const dest = finalRole === 'admin' || finalRole === 'authority' ? 'admin.html' : 'athlete.html';
+    setTimeout(() => { window.location.href = dest; }, 1200);
+
+  } catch (e) {
+    // Demo fallback
+    if (e.message.includes('fetch') || e.message.includes('Failed') || e.message.includes('NetworkError')) {
+      const user = { id: 'u-new', name, email, role: selectedRole };
+      localStorage.setItem('token', 'demo-token-' + selectedRole);
+      localStorage.setItem('user', JSON.stringify(user));
+      showSuccess('Demo account ready! Redirecting...');
+      const dest = (selectedRole === 'admin' || selectedRole === 'authority') ? 'admin.html' : 'athlete.html';
+      setTimeout(() => { window.location.href = dest; }, 1200);
+      return;
+    }
+    showError(e.message);
+    const titles = { athlete: 'Create Athlete Account', authority: 'Create Authority Account', admin: 'Create Admin Account' };
+    btn.textContent = (titles[selectedRole] || 'Create Account') + ' ->';
+    btn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>
+

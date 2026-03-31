@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title id="page-title">AthleteAI — Admin Dashboard</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='75' font-size='75' fill='%238b5cf6'>⚙️</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles/admin.css">
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-brand">AthleteAI</div>
+  <div class="nav-right">
+    <div class="admin-badge" id="nav-role-badge"><span class="role-dot"></span>ADMIN PANEL</div>
+    <div class="nav-user">
+      <div class="avatar" id="nav-avatar">A</div>
+      <span id="nav-name">Admin</span>
+    </div>
+    <button class="nav-btn" onclick="logout()">Sign Out</button>
+  </div>
+</nav>
+
+<div class="layout">
+  <aside class="sidebar">
+    <!-- ADMIN-ONLY SECTIONS -->
+    <div class="sidebar-label admin-only">System Management</div>
+    <button class="sidebar-item active admin-only" id="sn-overview" onclick="showSec('overview')">⚡ Overview</button>
+    <button class="sidebar-item admin-only" id="sn-athletes" onclick="showSec('athletes')">🏃 All Athletes</button>
+    <button class="sidebar-item admin-only" id="sn-authorities" onclick="showSec('authorities')">🏛️ All Authorities</button>
+    <button class="sidebar-item admin-only" id="sn-results" onclick="showSec('results')">📊 All Results</button>
+    <button class="sidebar-item admin-only" id="sn-flags" onclick="showSec('flags')">🚨 Cheat Flags</button>
+
+    <!-- AUTHORITY-ONLY SECTIONS -->
+    <div class="sidebar-label authority-only">Assessment Management</div>
+    <button class="sidebar-item active authority-only" id="sn-create-test" onclick="showSec('create-test')">📋 Create Test</button>
+    <button class="sidebar-item authority-only" id="sn-manage-tests" onclick="showSec('manage-tests')">🏆 Manage Tests</button>
+    <button class="sidebar-item authority-only" id="sn-leaderboard-admin" onclick="showSec('leaderboard-admin')">🥇 Leaderboard</button>
+  </aside>
+
+  <main class="content">
+
+    <!-- ── OVERVIEW (ADMIN ONLY) ── -->
+    <section id="sec-overview" class="admin-only">
+      <div class="admin-header">
+        <span style="font-size:1.75rem">⚡</span>
+        <div>
+          <div style="font-weight:700;font-size:1.1rem">Admin Dashboard</div>
+          <div style="font-size:.8rem;color:var(--muted)">Platform-wide analytics and management</div>
+        </div>
+        <span class="admin-pill">ADMIN</span>
+      </div>
+
+      <div class="stats-grid">
+        <div class="card stat-card card-admin"><div class="stat-icon">👥</div><div class="stat-val" id="s-athletes">—</div><div class="stat-label">Total Athletes</div></div>
+        <div class="card stat-card card-admin"><div class="stat-icon">🏛️</div><div class="stat-val" id="s-authorities">—</div><div class="stat-label">Authorities</div></div>
+        <div class="card stat-card card-admin"><div class="stat-icon">📹</div><div class="stat-val" id="s-sessions">—</div><div class="stat-label">Total Sessions</div></div>
+        <div class="card stat-card card-admin"><div class="stat-icon">✅</div><div class="stat-val" id="s-completed">—</div><div class="stat-label">Completed</div></div>
+        <div class="card stat-card card-admin"><div class="stat-icon">⭐</div><div class="stat-val" id="s-avgscore">—</div><div class="stat-label">Avg Form Score</div></div>
+        <div class="card stat-card card-admin"><div class="stat-icon">🚨</div><div class="stat-val danger" id="s-cheats">—</div><div class="stat-label">Cheat Flags</div></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem">
+        <div class="card card-admin">
+          <div class="section-title" style="margin-bottom:1rem">Exercise Breakdown</div>
+          <canvas id="ex-chart" height="200"></canvas>
+        </div>
+        <div class="card card-admin">
+          <div class="section-header"><span class="section-title">Recent Activity</span><span style="font-size:.75rem;color:var(--muted)">Last 6 tests</span></div>
+          <div id="recent-activity">Loading...</div>
+        </div>
+      </div>
+
+      <div class="card card-admin" style="margin-bottom:1.5rem">
+        <div class="section-header" style="margin-bottom:.9rem">
+          <span class="section-title">AI Drift Monitor</span>
+          <span style="font-size:.72rem;color:var(--muted);font-family:'JetBrains Mono',monospace">Live window: 14 days</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.75rem;margin-bottom:.9rem">
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.6rem .75rem"><div style="font-size:.62rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase">Mode</div><div id="ai-mode" style="font-family:'Bebas Neue',sans-serif;font-size:1.25rem;line-height:1.1">—</div></div>
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.6rem .75rem"><div style="font-size:.62rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase">Sample</div><div id="ai-sample" style="font-family:'Bebas Neue',sans-serif;font-size:1.25rem;line-height:1.1">—</div></div>
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.6rem .75rem"><div style="font-size:.62rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase">Overall Conf</div><div id="ai-confidence" style="font-family:'Bebas Neue',sans-serif;font-size:1.25rem;line-height:1.1">—</div></div>
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.6rem .75rem"><div style="font-size:.62rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase">Valid Conf</div><div id="ai-valid-confidence" style="font-family:'Bebas Neue',sans-serif;font-size:1.25rem;line-height:1.1">—</div></div>
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.6rem .75rem"><div style="font-size:.62rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase">Disagreement</div><div id="ai-disagreement" style="font-family:'Bebas Neue',sans-serif;font-size:1.25rem;line-height:1.1">—</div></div>
+          <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.6rem .75rem"><div style="font-size:.62rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase">Invalid Rate</div><div id="ai-invalid-rate" style="font-family:'Bebas Neue',sans-serif;font-size:1.25rem;line-height:1.1">—</div></div>
+        </div>
+        <div id="ai-health-note" style="font-size:.75rem;color:var(--muted);margin-bottom:.9rem"></div>
+        <div id="ai-alerts" style="margin-bottom:.9rem"></div>
+        <div style="margin:0 auto .9rem auto;max-width:980px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.75rem .9rem">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;margin-bottom:.4rem">
+            <div style="font-size:.66rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:.8px">Daily Trend (Confidence vs Disagreement)</div>
+            <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+              <button id="ai-metric-valid" class="btn btn-sm" onclick="setAiTrendMetric('valid')" style="padding:.25rem .55rem;font-size:.65rem;line-height:1;background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.35);color:var(--green)">Valid Confidence</button>
+              <button id="ai-metric-overall" class="btn btn-sm" onclick="setAiTrendMetric('overall')" style="padding:.25rem .55rem;font-size:.65rem;line-height:1;background:var(--surface3);border:1px solid var(--border);color:var(--muted)">Overall Confidence</button>
+            </div>
+          </div>
+          <div style="height:250px;position:relative">
+            <canvas id="ai-trend-chart"></canvas>
+          </div>
+        </div>
+        <div id="ai-by-exercise" style="font-size:.82rem;color:var(--muted)">Loading AI metrics...</div>
+      </div>
+    </section>
+
+    <!-- ── CREATE TEST (AUTHORITY ONLY) ── -->
+    <section id="sec-create-test" class="hidden authority-only">
+      <div class="page-title">Create Assessment</div>
+      <p class="page-sub">Schedule a new physical fitness test for athletes</p>
+      <div style="display:grid;grid-template-columns:1fr 320px;gap:1.5rem;max-width:960px">
+        <div>
+          <div class="card" style="margin-bottom:1rem">
+            <div class="section-title" style="margin-bottom:1.25rem">Test Details</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.875rem;margin-bottom:.875rem">
+              <div><label style="font-family:'JetBrains Mono',monospace;font-size:.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:.35rem">Test Name *</label>
+                <input type="text" id="ct-name" placeholder="Football Fitness Trial" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.9rem;padding:.7rem 1rem" onfocus="this.style.borderColor='var(--purple)'" onblur="this.style.borderColor=''"></div>
+              <div><label style="font-family:'JetBrains Mono',monospace;font-size:.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:.35rem">Sport *</label>
+                <input type="text" id="ct-sport" placeholder="Football" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.9rem;padding:.7rem 1rem" onfocus="this.style.borderColor='var(--purple)'" onblur="this.style.borderColor=''"></div>
+            </div>
+            <div style="margin-bottom:.875rem"><label style="font-family:'JetBrains Mono',monospace;font-size:.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:.35rem">Description</label>
+              <textarea id="ct-desc" rows="2" placeholder="Brief description of the test..." style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.9rem;padding:.7rem 1rem;resize:vertical" onfocus="this.style.borderColor='var(--purple)'" onblur="this.style.borderColor=''"></textarea></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.875rem">
+              <div><label style="font-family:'JetBrains Mono',monospace;font-size:.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:.35rem">Date *</label>
+                <input type="date" id="ct-date" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.9rem;padding:.7rem 1rem" onfocus="this.style.borderColor='var(--purple)'" onblur="this.style.borderColor=''"></div>
+              <div><label style="font-family:'JetBrains Mono',monospace;font-size:.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:.35rem">Start Time *</label>
+                <input type="time" id="ct-time" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.9rem;padding:.7rem 1rem" onfocus="this.style.borderColor='var(--purple)'" onblur="this.style.borderColor=''"></div>
+              <div><label style="font-family:'JetBrains Mono',monospace;font-size:.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:.35rem">Duration (min)</label>
+                <input type="number" id="ct-duration" value="60" min="5" max="300" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.9rem;padding:.7rem 1rem" onfocus="this.style.borderColor='var(--purple)'" onblur="this.style.borderColor=''"></div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-bottom:1rem">
+            <div class="section-title" style="margin-bottom:.875rem">Exercises Included</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:.625rem" id="ct-exercise-grid">
+              <label class="ct-ex-item" data-ex="pushup"><input type="checkbox" value="pushup"> 💪 Push-ups</label>
+              <label class="ct-ex-item" data-ex="situp"><input type="checkbox" value="situp"> 🤸 Sit-ups</label>
+              <label class="ct-ex-item" data-ex="squat"><input type="checkbox" value="squat"> 🏋️ Squats</label>
+              <label class="ct-ex-item" data-ex="vertical_jump"><input type="checkbox" value="vertical_jump"> 🦘 Vertical Jump</label>
+              <label class="ct-ex-item" data-ex="jumping_jack"><input type="checkbox" value="jumping_jack"> ⭐ Jumping Jacks</label>
+              <label class="ct-ex-item" data-ex="lunge"><input type="checkbox" value="lunge"> 🚶 Lunges</label>
+            </div>
+          </div>
+
+          <div id="ct-error" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:.65rem 1rem;font-size:.82rem;color:var(--red);margin-bottom:.875rem;display:none"></div>
+          <button class="btn btn-admin" onclick="submitCreateTest()" id="ct-submit-btn" style="width:100%;padding:1rem;font-size:1rem">📋 Publish Assessment →</button>
+        </div>
+        <div>
+          <div class="card" style="position:sticky;top:70px">
+            <div class="section-title" style="margin-bottom:.875rem">📋 Guidelines</div>
+            <div style="font-size:.8rem;color:var(--muted);line-height:1.7">
+              <div style="margin-bottom:.75rem">✅ Select at least one exercise for the test.</div>
+              <div style="margin-bottom:.75rem">✅ Athletes get notified on their dashboard after you publish.</div>
+              <div style="margin-bottom:.75rem">✅ Change status to <strong style="color:var(--green)">Active</strong> when the test starts.</div>
+              <div>✅ After all submissions, set to <strong style="color:var(--purple)">Completed</strong> to lock the leaderboard.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── MANAGE TESTS (AUTHORITY ONLY) ── -->
+    <section id="sec-manage-tests" class="hidden authority-only">
+      <div class="page-title">Manage Assessments</div>
+      <p class="page-sub">View all scheduled assessments • 🔄 Status updates automatically every minute based on current time</p>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem">
+        <div class="filter-row" style="margin:0">
+          <select id="mt-status-filter" onchange="loadManageTests()"><option value="">All</option><option value="upcoming">Upcoming</option><option value="active">Active</option><option value="completed">Completed</option></select>
+          <button class="btn btn-ghost btn-sm" onclick="loadManageTests()">🔄 Refresh Now</button>
+        </div>
+        <button class="btn btn-admin btn-sm" onclick="showSec('create-test')">+ Create New</button>
+      </div>
+      <div id="manage-tests-list"><div style="text-align:center;padding:3rem;color:var(--muted)">Loading...</div></div>
+    </section>
+
+    <!-- ── LEADERBOARD (AUTHORITY ONLY) ── -->
+    <section id="sec-leaderboard-admin" class="hidden authority-only">
+      <div class="page-title">Assessment Leaderboard</div>
+      <p class="page-sub">Rank athletes and shortlist for selection</p>
+      <div class="filter-row">
+        <select id="alb-test-select" onchange="loadAdminLeaderboard()" style="min-width:280px"><option value="">— Select an Assessment —</option></select>
+        <button class="btn btn-ghost btn-sm" onclick="loadAdminLeaderboard()">🔄 Refresh</button>
+      </div>
+      <div id="admin-leaderboard-body"><div style="text-align:center;padding:3rem;color:var(--muted)">Select an assessment to view rankings.</div></div>
+    </section>
+
+    <!-- ── ALL ATHLETES (ADMIN ONLY) ── -->
+    <section id="sec-athletes" class="hidden admin-only">
+      <div class="page-title">All Athletes</div>
+      <p class="page-sub">Registered athletes with performance stats</p>
+      <div class="filter-row">
+        <input type="number" id="f-age-min" placeholder="Min Age" style="max-width:110px">
+        <input type="number" id="f-age-max" placeholder="Max Age" style="max-width:110px">
+        <select id="f-level"><option value="">All Levels</option><option>Advanced</option><option>Intermediate</option><option>Beginner</option></select>
+        <select id="f-ex"><option value="">All Exercises</option><option value="pushup">Push-ups</option><option value="squat">Squats</option><option value="vertical_jump">Vertical Jump</option></select>
+        <button class="btn btn-admin btn-sm" onclick="loadAthletes()">🔍 Filter</button>
+        <button class="btn btn-ghost btn-sm" onclick="clearFilters()">✕ Clear</button>
+      </div>
+      <div class="card">
+        <table class="tbl">
+          <thead><tr><th>Name</th><th>Email</th><th>Age</th><th>Height</th><th>Weight</th><th>Tests</th><th>Avg Score</th><th>Last Test</th></tr></thead>
+          <tbody id="athletes-body"><tr><td colspan="8" style="text-align:center;color:var(--muted);padding:2rem">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── ALL AUTHORITIES (ADMIN ONLY) ── -->
+    <section id="sec-authorities" class="hidden admin-only">
+      <div class="page-title">All Authorities</div>
+      <p class="page-sub">Registered sports authorities and organizations</p>
+      <div class="filter-row">
+        <input type="text" id="f-auth-search" placeholder="Search by name or email..." style="min-width:250px" onkeyup="filterAuthorities()">
+        <button class="btn btn-admin btn-sm" onclick="loadAuthorities()">🔄 Refresh</button>
+      </div>
+      <div class="card">
+        <table class="tbl">
+          <thead><tr><th>Name</th><th>Email</th><th>Joined</th><th>Tests Created</th><th>Total Participants</th><th>Status</th></tr></thead>
+          <tbody id="authorities-body"><tr><td colspan="6" style="text-align:center;color:var(--muted);padding:2rem">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── ALL RESULTS (ADMIN ONLY) ── -->
+    <section id="sec-results" class="hidden admin-only">
+      <div class="page-title">All Test Results</div>
+      <p class="page-sub">Every test submitted across the platform</p>
+      <div class="filter-row">
+        <select id="fr-ex"><option value="">All Exercises</option><option value="pushup">Push-ups</option><option value="squat">Squats</option><option value="vertical_jump">Vertical Jump</option><option value="jumping_jack">Jumping Jacks</option><option value="situp">Sit-ups</option></select>
+        <select id="fr-level"><option value="">All Levels</option><option>Advanced</option><option>Intermediate</option><option>Beginner</option></select>
+        <select id="fr-cheat"><option value="">All Results</option><option value="flagged">Flagged Only</option><option value="clean">Clean Only</option></select>
+        <button class="btn btn-admin btn-sm" onclick="loadResults()">🔍 Filter</button>
+        <button class="btn btn-ghost btn-sm" onclick="loadResults(true)">🔄 Refresh</button>
+      </div>
+      <div class="card">
+        <table class="tbl">
+          <thead><tr><th>Athlete</th><th>Exercise</th><th>Date</th><th>Reps</th><th>Form Score</th><th>Level</th><th>Grade</th><th>Cheat?</th></tr></thead>
+          <tbody id="results-body"><tr><td colspan="8" style="text-align:center;color:var(--muted);padding:2rem">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── CHEAT FLAGS (ADMIN ONLY) ── -->
+    <section id="sec-flags" class="hidden admin-only">
+      <div class="page-title">🚨 Cheat Flags</div>
+      <p class="page-sub">Tests flagged by AI for suspicious behaviour</p>
+      <div id="flags-summary" style="margin-bottom:1.5rem"></div>
+      <div class="card">
+        <table class="tbl">
+          <thead><tr><th>Athlete</th><th>Email</th><th>Exercise</th><th>Date</th><th>Reps</th><th>Score</th><th>Reasons Detected</th></tr></thead>
+          <tbody id="flags-body"><tr><td colspan="7" style="text-align:center;color:var(--muted);padding:2rem">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div id="toast-c"></div>
+
+<div id="lb-video-modal" class="video-modal" onclick="closeLeaderboardVideo(event)">
+  <div class="video-card" onclick="event.stopPropagation()">
+    <div class="video-head">
+      <div id="lb-video-title" class="video-title">Athlete Recording</div>
+      <button class="btn btn-ghost btn-sm" onclick="closeLeaderboardVideo()">✕ Close</button>
+    </div>
+    <div class="video-body">
+      <video id="lb-video-player" controls playsinline preload="metadata"></video>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script>
+const API   = 'http://localhost:8000/api';
+const token = localStorage.getItem('token');
+const user  = JSON.parse(localStorage.getItem('user') || 'null');
+let charts  = {};
+let allResults = null; // cache
+let aiTrendMetric = 'valid';
+
+// ── Guard ─────────────────────────────────────────────────────────────────
+if (!token || !user) {
+  window.location.href = 'login.html';
+} else if (user.role !== 'admin' && user.role !== 'authority') {
+  window.location.href = 'athlete.html';
+} else {
+  // Set body class based on role
+  document.body.className = `role-${user.role}`;
+
+  // Update page title based on role
+  document.getElementById('page-title').textContent =
+    user.role === 'authority' ? 'AthleteAI — Authority Portal' : 'AthleteAI — Admin Dashboard';
+
+  const ini = user.name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
+  document.getElementById('nav-avatar').textContent = ini;
+  document.getElementById('nav-name').textContent   = user.name;
+  const badge = document.getElementById('nav-role-badge');
+  if (user.role === 'authority') {
+    badge.className = 'admin-badge authority-badge';
+    badge.innerHTML = `<span class="role-dot"></span>🏛️ AUTHORITY`;
+  } else {
+    badge.innerHTML = `<span class="role-dot"></span>⚡ ADMIN PANEL`;
+  }
+
+  // Show appropriate default section based on role
+  const defaultSection = user.role === 'authority' ? 'create-test' : 'overview';
+  showSec(defaultSection);
+}
+
+function logout() {
+  localStorage.removeItem('token'); localStorage.removeItem('user');
+  window.location.href = 'login.html';
+}
+
+// ── API helper ─────────────────────────────────────────────────────────────
+async function api(method, path, body=null) {
+  const h = { Authorization: `Bearer ${token}` };
+  if (body) h['Content-Type'] = 'application/json';
+  try {
+    const r = await fetch(`${API}${path}`, { method, headers: h, body: body ? JSON.stringify(body) : null });
+    if (r.status === 401) { logout(); return null; }
+    if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.detail||`Error ${r.status}`); }
+    return await r.json();
+  } catch(e) {
+    if (e.message.includes('fetch')||e.message.includes('Failed')||e.message.includes('Network')) return demo(path);
+    throw e;
+  }
+}
+
+// ── Demo data ──────────────────────────────────────────────────────────────
+function demo(path) {
+  if (path==='/admin/stats')   return mkStats();
+  if (path==='/admin/ai-metrics?days=14') return mkAiMetrics();
+  if (path==='/admin/ai-metrics') return mkAiMetrics();
+  if (path==='/admin/results') return mkResults();
+  if (path==='/admin/athletes') return mkAthletes();
+  if (path==='/admin/authorities') return mkAuthorities();
+  if (path==='/tests'||path.startsWith('/tests?')) return mkDemoTests();
+  if (path.includes('/leaderboard')) return mkDemoLeaderboard();
+  if (path.includes('/participants')) return [{user_id:'u1',name:'Alice Chen',email:'alice@demo.com',registered_at:new Date().toISOString()},{user_id:'u2',name:'Bob Kim',email:'bob@demo.com',registered_at:new Date().toISOString()}];
+  if (path.includes('/status')) return {success:true};
+  if (path.includes('/tests') && path.length > 8) return {test_id:'t-new',status:'upcoming'};
+  return {};
+}
+function mkStats() {
+  return {
+    total_athletes:47, total_authorities:6, total_sessions:312, completed_sessions:298,
+    avg_correctness_score:76.4, cheat_flags:3,
+    exercise_breakdown:[
+      {exercise_type:'pushup',count:98},{exercise_type:'squat',count:87},
+      {exercise_type:'vertical_jump',count:64},{exercise_type:'jumping_jack',count:63}
+    ],
+    recent_activity: Array.from({length:6},(_,i)=>({
+      name:['Alice C.','Bob K.','Sara P.','Mike L.','Emma W.','James T.'][i],
+      exercise_type:['pushup','squat','vertical_jump','jumping_jack','situp','pushup'][i],
+      avg_correctness_score:68+i*5,
+      fitness_level:['Intermediate','Advanced','Beginner','Intermediate','Advanced','Beginner'][i],
+      created_at: new Date(Date.now()-i*7200000).toISOString()
+    }))
+  };
+}
+function mkAiMetrics() {
+  const today = new Date();
+  const trend = Array.from({length:14},(_,idx)=>{
+    const d = new Date(today);
+    d.setDate(today.getDate() - (13 - idx));
+    return {
+      date: d.toISOString().slice(0,10),
+      sample_size: 8 + (idx % 6),
+      confidence_score: 78 + Math.sin(idx/2) * 4,
+      valid_confidence_score: 84 + Math.sin(idx/2.2) * 3,
+      valid_sample_size: 7 + (idx % 5),
+      rule_ml_disagreement: 10 + Math.cos(idx/3) * 2.2,
+      quality_flag_rate: 0.08 + ((idx % 5) * 0.012),
+      invalid_capture_rate: 0.12 + ((idx % 4) * 0.018)
+    };
+  });
+
+  return {
+    window_days:14,
+    sample_size:312,
+    scoring_mode:'hybrid',
+    averages:{
+      rule_score:74.2,
+      ml_score:77.1,
+      hybrid_score:75.5,
+      confidence_score:81.8,
+      valid_capture_confidence_score:86.1,
+      rule_ml_disagreement:9.4,
+      quality_flag_rate:0.142,
+      invalid_capture_rate:0.116
+    },
+    drift_alerts:[],
+    by_exercise:{
+      pushup:{sample_size:98,hybrid_score:77.4,confidence_score:83.1,valid_capture_confidence_score:87.3,invalid_capture_rate:0.1},
+      squat:{sample_size:87,hybrid_score:74.9,confidence_score:80.2,valid_capture_confidence_score:84.4,invalid_capture_rate:0.14},
+      vertical_jump:{sample_size:64,hybrid_score:73.8,confidence_score:79.1,valid_capture_confidence_score:82.2,invalid_capture_rate:0.19},
+      jumping_jack:{sample_size:63,hybrid_score:76.6,confidence_score:82.3,valid_capture_confidence_score:85.5,invalid_capture_rate:0.12}
+    },
+    daily_trend: trend
+  };
+}
+function mkResults() {
+  const ex=['pushup','squat','vertical_jump','jumping_jack','situp'],lv=['Beginner','Intermediate','Advanced'],gr=['A','B','C','D'];
+  const names=['Alice Chen','Bob Kim','Sara Patel','Mike Lee','Emma Wang','James Taylor'];
+  return Array.from({length:16},(_,i)=>({
+    id:'r'+i, user_id:'u'+(i%5),
+    athlete_name:names[i%names.length],
+    athlete_email:`athlete${i%5}@demo.com`,
+    exercise_type:ex[i%ex.length],
+    total_reps:12+i*2, avg_correctness_score:60+i*2.5,
+    duration_seconds:30+i, fitness_level:lv[i%3],
+    form_grade:gr[i%4], estimated_percentile:30+i*3,
+    cheat_detected:i===2||i===9?1:0,
+    cheat_reasons:i===2?['Face hidden in 65% of frames']:i===9?['Sudden confidence drops detected','Abnormal speed spikes']:[],
+    created_at:new Date(Date.now()-i*86400000*2).toISOString()
+  }));
+}
+function mkAthletes() {
+  return Array.from({length:12},(_,i)=>({
+    id:'u'+i,
+    name:['Alice Chen','Bob Kim','Sara Patel','Mike Lee','Emma Wang','James Taylor'][i%6],
+    email:`athlete${i}@demo.com`,
+    age:20+i*2, height_cm:160+i*3, weight_kg:55+i*4,
+    total_tests:2+i, avg_score:62+i*2.5,
+    last_test:new Date(Date.now()-i*86400000).toISOString()
+  }));
+}
+function mkAuthorities() {
+  return [
+    {id:'auth1',name:'City Football Academy',email:'football@cityacademy.com',created_at:new Date('2026-01-15').toISOString(),tests_created:12,total_participants:248,status:'Active'},
+    {id:'auth2',name:'National Athletics Board',email:'info@nationalathletics.org',created_at:new Date('2026-02-01').toISOString(),tests_created:8,total_participants:156,status:'Active'},
+    {id:'auth3',name:'State Basketball League',email:'admin@basketballstate.com',created_at:new Date('2026-01-20').toISOString(),tests_created:15,total_participants:320,status:'Active'},
+    {id:'auth4',name:'Regional Cricket Club',email:'cricket@regional.com',created_at:new Date('2026-02-10').toISOString(),tests_created:5,total_participants:89,status:'Active'},
+    {id:'auth5',name:'Youth Sports Foundation',email:'contact@youthsports.org',created_at:new Date('2026-01-05').toISOString(),tests_created:20,total_participants:412,status:'Active'},
+    {id:'auth6',name:'Olympic Training Center',email:'admin@olympictraining.com',created_at:new Date('2025-12-20').toISOString(),tests_created:28,total_participants:567,status:'Active'},
+  ];
+}
+function mkDemoTests() {
+  return [
+    {id:'t1',name:'Football Fitness Test',sport:'Football',exercises:[{type:'pushup',weight:0.5},{type:'situp',weight:0.5}],scheduled_date:'2026-03-20',start_time:'10:00',duration_minutes:60,description:'Annual football selection test',status:'upcoming',participant_count:18,is_registered:false,created_by_name:'You'},
+    {id:'t2',name:'Athletics Selection Trial',sport:'Athletics',exercises:[{type:'vertical_jump',weight:0.6},{type:'squat',weight:0.4}],scheduled_date:'2026-03-15',start_time:'09:00',duration_minutes:90,description:'Sprint and jump assessments',status:'active',participant_count:31,is_registered:false,created_by_name:'You'},
+    {id:'t3',name:'Basketball Tryouts',sport:'Basketball',exercises:[{type:'jumping_jack',weight:0.5},{type:'lunge',weight:0.5}],scheduled_date:'2026-03-10',start_time:'14:00',duration_minutes:45,description:'City basketball league evaluation',status:'completed',participant_count:24,is_registered:false,created_by_name:'You'},
+  ];
+}
+function mkDemoLeaderboard() {
+  const names=['Rahul Singh','Ahmed Al-Farsi','Priya Patel','John Smith','Emma Watson','Carlos Diaz'];
+  const emails=['rahul@demo.com','ahmed@demo.com','priya@demo.com','john@demo.com','emma@demo.com','carlos@demo.com'];
+  return names.map((name,i)=>({rank:i+1,user_id:'u'+i,session_id:'s-demo-'+i,video_available:true,name,email:emails[i],score:94-i*4,form_grade:['A','A','B','B','C','C'][i],avg_correctness_score:91-i*3,total_reps:35-i*3,fitness_level:['Advanced','Advanced','Intermediate','Intermediate','Beginner','Beginner'][i],cheat_detected:i===4}));
+}
+
+// ── Navigation ─────────────────────────────────────────────────────────────
+var autoRefreshInterval = null;  // Use var for global scope safety
+
+function showSec(s) {
+  // Clear any existing auto-refresh interval
+  try {
+    if (autoRefreshInterval) {
+      clearInterval(autoRefreshInterval);
+      autoRefreshInterval = null;
+    }
+  } catch(e) { /* Ignore if interval doesn't exist */ }
+  
+  document.querySelectorAll('[id^="sec-"]').forEach(el=>el.classList.add('hidden'));
+  document.getElementById('sec-'+s)?.classList.remove('hidden');
+  document.querySelectorAll('.sidebar-item').forEach(el=>el.classList.remove('active'));
+  document.getElementById('sn-'+s)?.classList.add('active');
+  if      (s==='overview') {
+    loadOverview();
+    autoRefreshInterval = setInterval(function() { loadAiMetrics(); }, 60000);
+  }
+  else if (s==='athletes')          loadAthletes();
+  else if (s==='authorities')       loadAuthorities();
+  else if (s==='results')           loadResults();
+  else if (s==='flags')             loadFlags();
+  else if (s==='manage-tests') {
+    loadManageTests();
+    // Auto-refresh manage tests every 60 seconds to update status automatically
+    autoRefreshInterval = setInterval(function() { loadManageTests(); }, 60000);
+  }
+  else if (s==='leaderboard-admin') { populateAdminTestSelect(); loadAdminLeaderboard(); }
+}
+
+// ── Overview ───────────────────────────────────────────────────────────────
+async function loadOverview() {
+  try {
+    const s = await api('GET','/admin/stats');
+    if (!s) return;
+
+    document.getElementById('s-athletes').textContent    = s.total_athletes;
+    document.getElementById('s-authorities').textContent = s.total_authorities || 0;
+    document.getElementById('s-sessions').textContent    = s.total_sessions;
+    document.getElementById('s-completed').textContent   = s.completed_sessions;
+    document.getElementById('s-avgscore').textContent    = s.avg_correctness_score + '%';
+    document.getElementById('s-cheats').textContent      = s.cheat_flags;
+
+    // Exercise chart
+    const ctx = document.getElementById('ex-chart').getContext('2d');
+    if (charts.ex) charts.ex.destroy();
+    charts.ex = new Chart(ctx, {
+      type:'bar',
+      data:{
+        labels: s.exercise_breakdown.map(e=>fmtEx(e.exercise_type)),
+        datasets:[{data:s.exercise_breakdown.map(e=>e.count),backgroundColor:['#8b5cf6','#00d4ff','#f59e0b','#10b981'],borderRadius:8,borderSkipped:false}]
+      },
+      options:{responsive:true,plugins:{legend:{display:false}},scales:{
+        x:{ticks:{color:'#5a7090',font:{size:11}},grid:{display:false}},
+        y:{ticks:{color:'#5a7090',font:{size:11}},grid:{color:'rgba(139,92,246,.1)'}}
+      }}
+    });
+
+    // Recent activity
+    document.getElementById('recent-activity').innerHTML = s.recent_activity.map(a=>`
+      <div class="activity-item">
+        <div>
+          <div style="font-weight:500;font-size:.875rem">${a.name}</div>
+          <div style="color:var(--muted);font-size:.75rem;margin-top:2px">${fmtEx(a.exercise_type)} · ${fmtDate(a.created_at)}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-weight:600;font-size:.875rem">${a.avg_correctness_score?.toFixed(0)}%</div>
+          <span class="badge ${lCol(a.fitness_level)}" style="font-size:.62rem">${a.fitness_level}</span>
+        </div>
+      </div>`).join('');
+
+    await loadAiMetrics();
+  } catch(e) { console.error(e); toast('Failed to load stats','err'); }
+}
+
+async function loadAiMetrics() {
+  try {
+    const m = await api('GET','/admin/ai-metrics?days=14');
+    if (!m) return;
+
+    const av = m.averages || {};
+    document.getElementById('ai-mode').textContent = String(m.scoring_mode || 'unknown').toUpperCase();
+    document.getElementById('ai-sample').textContent = String(m.sample_size ?? 0);
+    document.getElementById('ai-confidence').textContent = `${(av.confidence_score ?? 0).toFixed(1)}%`;
+    document.getElementById('ai-valid-confidence').textContent = `${(av.valid_capture_confidence_score ?? 0).toFixed(1)}%`;
+    document.getElementById('ai-disagreement').textContent = `${(av.rule_ml_disagreement ?? 0).toFixed(1)}%`;
+    document.getElementById('ai-invalid-rate').textContent = `${((av.invalid_capture_rate ?? 0) * 100).toFixed(1)}%`;
+
+    const validConf = Number(av.valid_capture_confidence_score ?? 0);
+    const invalidRate = Number(av.invalid_capture_rate ?? 0) * 100;
+    document.getElementById('ai-health-note').textContent = `Overall confidence includes invalid attempts. Valid-capture confidence isolates high-quality captures (${validConf.toFixed(1)}%), while invalid capture rate is ${invalidRate.toFixed(1)}%.`;
+    setAiTrendMetric(aiTrendMetric);
+
+    const alerts = Array.isArray(m.drift_alerts) ? m.drift_alerts : [];
+    document.getElementById('ai-alerts').innerHTML = alerts.length
+      ? `<div style="display:flex;gap:.45rem;flex-wrap:wrap">${alerts.map(a=>`<span class="badge badge-red">⚠ ${String(a).replaceAll('_',' ')}</span>`).join('')}</div>`
+      : '<span class="badge badge-green">✅ no drift alerts</span>';
+
+    const bx = m.by_exercise || {};
+    const rows = Object.entries(bx).sort((a,b)=>((b[1]?.sample_size||0)-(a[1]?.sample_size||0)));
+    document.getElementById('ai-by-exercise').innerHTML = rows.length
+      ? `<table class="tbl"><thead><tr><th>Exercise</th><th>Sample</th><th>Hybrid Score</th><th>Valid Conf</th><th>Invalid Rate</th></tr></thead><tbody>${rows.map(([ex,v])=>`<tr><td>${icon(ex)} ${fmtEx(ex)}</td><td>${v.sample_size||0}</td><td>${(v.hybrid_score??0).toFixed(1)}%</td><td>${(v.valid_capture_confidence_score??0).toFixed(1)}%</td><td>${((v.invalid_capture_rate??0)*100).toFixed(1)}%</td></tr>`).join('')}</tbody></table>`
+      : '<div style="color:var(--muted)">No per-exercise AI data yet.</div>';
+
+    renderAiTrendChart(m.daily_trend || []);
+  } catch(e) {
+    const target = document.getElementById('ai-by-exercise');
+    if (target) target.innerHTML = `<div style="color:var(--red)">Failed to load AI metrics: ${e.message}</div>`;
+  }
+}
+
+function setAiTrendMetric(mode) {
+  aiTrendMetric = (mode === 'overall') ? 'overall' : 'valid';
+  const bValid = document.getElementById('ai-metric-valid');
+  const bOverall = document.getElementById('ai-metric-overall');
+  if (bValid && bOverall) {
+    const validActive = aiTrendMetric === 'valid';
+    bValid.style.background = validActive ? 'rgba(16,185,129,.15)' : 'var(--surface3)';
+    bValid.style.borderColor = validActive ? 'rgba(16,185,129,.35)' : 'var(--border)';
+    bValid.style.color = validActive ? 'var(--green)' : 'var(--muted)';
+    bOverall.style.background = !validActive ? 'rgba(0,212,255,.12)' : 'var(--surface3)';
+    bOverall.style.borderColor = !validActive ? 'rgba(0,212,255,.35)' : 'var(--border)';
+    bOverall.style.color = !validActive ? 'var(--cyan)' : 'var(--muted)';
+  }
+  if (window.__lastAiTrendSeries) renderAiTrendChart(window.__lastAiTrendSeries);
+}
+
+function renderAiTrendChart(series) {
+  const canvas = document.getElementById('ai-trend-chart');
+  if (!canvas || !window.Chart) return;
+  window.__lastAiTrendSeries = Array.isArray(series) ? series : [];
+
+  const safeSeries = (Array.isArray(series) ? series : [])
+    .map(p => {
+      const confidenceVal = Number(p?.confidence_score);
+      const validConfidenceVal = Number(p?.valid_confidence_score);
+      const disagreementVal = Number(p?.rule_ml_disagreement);
+      return {
+        date: String(p?.date || ''),
+        confidence_score: Number.isFinite(confidenceVal) ? Math.max(0, Math.min(100, confidenceVal)) : null,
+        valid_confidence_score: Number.isFinite(validConfidenceVal) ? Math.max(0, Math.min(100, validConfidenceVal)) : null,
+        rule_ml_disagreement: Number.isFinite(disagreementVal) ? Math.max(0, Math.min(100, disagreementVal)) : null,
+      };
+    })
+    .filter(p => p.date)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const labels = safeSeries.map(p => p.date.slice(5));
+  const useOverall = aiTrendMetric === 'overall';
+  const confidence = safeSeries.map(p => useOverall ? p.confidence_score : (p.valid_confidence_score ?? p.confidence_score));
+  const disagreement = safeSeries.map(p => p.rule_ml_disagreement);
+
+  if (charts.aiTrend) charts.aiTrend.destroy();
+  charts.aiTrend = new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: useOverall ? 'Overall Confidence %' : 'Valid Confidence %',
+          data: confidence,
+          borderColor: '#10b981',
+          backgroundColor: 'rgba(16,185,129,.15)',
+          borderWidth: 2,
+          tension: 0,
+          pointRadius: 2,
+          pointHoverRadius: 3,
+          spanGaps: false
+        },
+        {
+          label: 'Disagreement %',
+          data: disagreement,
+          borderColor: '#f59e0b',
+          backgroundColor: 'rgba(245,158,11,.15)',
+          borderWidth: 2,
+          tension: 0,
+          pointRadius: 2,
+          pointHoverRadius: 3,
+          spanGaps: false
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: { color: '#5a7090', boxWidth: 10, boxHeight: 10, font: { size: 10 } }
+        }
+      },
+      scales: {
+        x: {
+          offset: true,
+          ticks: { color: '#5a7090', font: { size: 10 } },
+          grid: { display: false }
+        },
+        y: {
+          beginAtZero: true,
+          min: 0,
+          max: 100,
+          ticks: { color: '#5a7090', font: { size: 10 } },
+          grid: { color: 'rgba(139,92,246,.08)' }
+        }
+      }
+    }
+  });
+}
+
+// ── Athletes ───────────────────────────────────────────────────────────────
+async function loadAthletes() {
+  const tb = document.getElementById('athletes-body');
+  tb.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:2rem">Loading...</td></tr>';
+  try {
+    let url = '/admin/athletes';
+    const p = new URLSearchParams();
+    const mn = document.getElementById('f-age-min')?.value;
+    const mx = document.getElementById('f-age-max')?.value;
+    const lv = document.getElementById('f-level')?.value;
+    const ex = document.getElementById('f-ex')?.value;
+    if (mn) p.append('age_min',mn);
+    if (mx) p.append('age_max',mx);
+    if (lv) p.append('fitness_level',lv);
+    if (ex) p.append('exercise_type',ex);
+    if (p.toString()) url += '?' + p.toString();
+
+    const athletes = await api('GET', url);
+    if (!athletes?.length) {
+      tb.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:2rem">No athletes found</td></tr>';
+      return;
+    }
+    tb.innerHTML = athletes.map(a=>`<tr>
+      <td><div style="font-weight:600">${a.name}</div></td>
+      <td style="color:var(--muted);font-size:.82rem">${a.email}</td>
+      <td>${a.age||'—'}</td>
+      <td>${a.height_cm ? a.height_cm+'cm' : '—'}</td>
+      <td>${a.weight_kg ? a.weight_kg+'kg' : '—'}</td>
+      <td><span class="badge badge-purple">${a.total_tests||0} tests</span></td>
+      <td>${a.avg_score ? `<div style="display:flex;align-items:center;gap:.5rem"><div class="prog-bar" style="width:70px"><div class="prog-fill" style="width:${a.avg_score}%"></div></div><span style="font-size:.75rem;color:var(--muted)">${a.avg_score.toFixed(0)}%</span></div>` : '—'}</td>
+      <td style="color:var(--muted);font-size:.82rem">${a.last_test ? fmtDate(a.last_test) : 'Never'}</td>
+    </tr>`).join('');
+  } catch(e) { tb.innerHTML = `<tr><td colspan="8" style="color:var(--red);text-align:center;padding:2rem">${e.message}</td></tr>`; }
+}
+
+function clearFilters() {
+  ['f-age-min','f-age-max','f-level','f-ex'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  loadAthletes();
+}
+
+// ── All Authorities ────────────────────────────────────────────────────────
+let cachedAuthorities = null;
+
+async function loadAuthorities() {
+  const tb = document.getElementById('authorities-body');
+  tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:2rem">Loading...</td></tr>';
+  try {
+    const authorities = await api('GET', '/admin/authorities');
+    cachedAuthorities = authorities;
+
+    if (!authorities?.length) {
+      tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:2rem">No authorities found</td></tr>';
+      return;
+    }
+
+    renderAuthorities(authorities);
+  } catch(e) {
+    tb.innerHTML = `<tr><td colspan="6" style="color:var(--red);text-align:center;padding:2rem">${e.message}</td></tr>`;
+  }
+}
+
+function renderAuthorities(authorities) {
+  const tb = document.getElementById('authorities-body');
+  tb.innerHTML = authorities.map(auth => `<tr>
+    <td><div style="font-weight:600">🏛️ ${auth.name}</div></td>
+    <td style="color:var(--muted);font-size:.82rem">${auth.email}</td>
+    <td style="color:var(--muted);font-size:.82rem">${fmtDate(auth.created_at)}</td>
+    <td><span class="badge badge-amber">${auth.tests_created || 0} tests</span></td>
+    <td><span class="badge badge-cyan">${auth.total_participants || 0} athletes</span></td>
+    <td><span class="badge badge-green">${auth.status || 'Active'}</span></td>
+  </tr>`).join('');
+}
+
+function filterAuthorities() {
+  if (!cachedAuthorities) return;
+
+  const searchTerm = document.getElementById('f-auth-search')?.value.toLowerCase().trim();
+
+  if (!searchTerm) {
+    renderAuthorities(cachedAuthorities);
+    return;
+  }
+
+  const filtered = cachedAuthorities.filter(auth =>
+    auth.name.toLowerCase().includes(searchTerm) ||
+    auth.email.toLowerCase().includes(searchTerm)
+  );
+
+  const tb = document.getElementById('authorities-body');
+  if (!filtered.length) {
+    tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:2rem">No authorities match your search</td></tr>';
+    return;
+  }
+
+  renderAuthorities(filtered);
+}
+
+// ── All Results ────────────────────────────────────────────────────────────
+async function loadResults(forceRefresh=false) {
+  const tb = document.getElementById('results-body');
+  tb.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:2rem">Loading...</td></tr>';
+  try {
+    if (!allResults || forceRefresh) allResults = await api('GET','/admin/results');
+    let res = [...(allResults||[])];
+
+    const ef  = document.getElementById('fr-ex')?.value;
+    const lf  = document.getElementById('fr-level')?.value;
+    const chf = document.getElementById('fr-cheat')?.value;
+    if (ef)  res = res.filter(r=>r.exercise_type===ef);
+    if (lf)  res = res.filter(r=>r.fitness_level===lf);
+    if (chf==='flagged') res = res.filter(r=>r.cheat_detected);
+    if (chf==='clean')   res = res.filter(r=>!r.cheat_detected);
+
+    if (!res.length) {
+      tb.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:2rem">No results found</td></tr>';
+      return;
+    }
+    tb.innerHTML = res.map(r=>`<tr class="${r.cheat_detected?'cheat-row':''}">
+      <td>
+        <div style="font-weight:600">${r.athlete_name||'Unknown'}</div>
+        <div style="font-size:.72rem;color:var(--muted)">${r.athlete_email||''}</div>
+      </td>
+      <td>${icon(r.exercise_type)} ${fmtEx(r.exercise_type)}</td>
+      <td style="color:var(--muted);font-size:.82rem">${fmtDate(r.created_at)}</td>
+      <td><strong>${r.total_reps}</strong></td>
+      <td>${sBar(r.avg_correctness_score)}</td>
+      <td><span class="badge ${lCol(r.fitness_level)}">${r.fitness_level||'—'}</span></td>
+      <td><span class="badge ${gCol(r.form_grade)}">${r.form_grade||'—'}</span></td>
+      <td>${r.cheat_detected
+        ? '<span class="badge badge-red">⚠️ Flagged</span>'
+        : '<span class="badge badge-green">✓ Clean</span>'}</td>
+    </tr>`).join('');
+  } catch(e) { tb.innerHTML = `<tr><td colspan="8" style="color:var(--red);text-align:center;padding:2rem">${e.message}</td></tr>`; }
+}
+
+// ── Cheat Flags ────────────────────────────────────────────────────────────
+async function loadFlags() {
+  const tb = document.getElementById('flags-body');
+  tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:2rem">Loading...</td></tr>';
+  try {
+    if (!allResults) allResults = await api('GET','/admin/results');
+    const flagged = (allResults||[]).filter(r=>r.cheat_detected);
+
+    // Summary banner
+    document.getElementById('flags-summary').innerHTML = flagged.length
+      ? `<div style="background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:1rem 1.5rem;display:flex;align-items:center;gap:1rem">
+           <span style="font-size:2rem">🚨</span>
+           <div><div style="font-weight:600;color:var(--red)">${flagged.length} Flagged Test${flagged.length>1?'s':''} Detected</div>
+           <div style="font-size:.82rem;color:var(--muted);margin-top:2px">These tests were flagged by AI for suspicious movement patterns. Review and take action as needed.</div></div>
+         </div>`
+      : `<div style="background:rgba(16,185,129,.07);border:1px solid rgba(16,185,129,.3);border-radius:10px;padding:1rem 1.5rem;display:flex;align-items:center;gap:1rem">
+           <span style="font-size:2rem">✅</span>
+           <div style="font-weight:600;color:var(--green)">No cheat flags detected — all tests look clean!</div>
+         </div>`;
+
+    if (!flagged.length) {
+      tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--green);padding:2rem">✅ No flagged tests</td></tr>';
+      return;
+    }
+    tb.innerHTML = flagged.map(r=>`<tr>
+      <td><div style="font-weight:600">${r.athlete_name||'Unknown'}</div></td>
+      <td style="color:var(--muted);font-size:.82rem">${r.athlete_email||'—'}</td>
+      <td>${icon(r.exercise_type)} ${fmtEx(r.exercise_type)}</td>
+      <td style="color:var(--muted);font-size:.82rem">${fmtDate(r.created_at)}</td>
+      <td><strong>${r.total_reps}</strong></td>
+      <td>${sBar(r.avg_correctness_score)}</td>
+      <td style="font-size:.8rem;color:var(--red)">${(r.cheat_reasons||['No detail available']).map(reason=>`<div style="margin-bottom:3px">⚠️ ${reason}</div>`).join('')}</td>
+    </tr>`).join('');
+  } catch(e) { tb.innerHTML = `<tr><td colspan="7" style="color:var(--red);text-align:center;padding:2rem">${e.message}</td></tr>`; }
+}
+
+// ── Create Test ────────────────────────────────────────────────────────────
+async function submitCreateTest() {
+  const name     = document.getElementById('ct-name').value.trim();
+  const sport    = document.getElementById('ct-sport').value.trim();
+  const date     = document.getElementById('ct-date').value;
+  const time     = document.getElementById('ct-time').value;
+  const duration = parseInt(document.getElementById('ct-duration').value) || 60;
+  const desc     = document.getElementById('ct-desc').value.trim();
+  const errEl    = document.getElementById('ct-error');
+  errEl.style.display = 'none';
+
+  const checked = [...document.querySelectorAll('#ct-exercise-grid input:checked')].map(cb=>cb.value);
+  if (!name)           { errEl.textContent='Test name is required'; errEl.style.display='block'; return; }
+  if (!sport)          { errEl.textContent='Sport is required'; errEl.style.display='block'; return; }
+  if (!date)           { errEl.textContent='Date is required'; errEl.style.display='block'; return; }
+  if (!time)           { errEl.textContent='Start time is required'; errEl.style.display='block'; return; }
+  if (!checked.length) { errEl.textContent='Select at least one exercise'; errEl.style.display='block'; return; }
+
+  const totalWeight = 1 / checked.length;
+  const exercises = checked.map(t => ({ type: t, weight: Math.round(totalWeight * 100) / 100 }));
+
+  const btn = document.getElementById('ct-submit-btn');
+  btn.textContent = 'Publishing...'; btn.disabled = true;
+  try {
+    await api('POST', '/tests', { name, sport, exercises, scheduled_date: date, start_time: time, duration_minutes: duration, description: desc || null });
+    toast('Assessment published! Athletes have been notified.', 'ok');
+    // Reset form
+    ['ct-name','ct-sport','ct-desc'].forEach(id=>document.getElementById(id).value='');
+    document.querySelectorAll('#ct-exercise-grid input').forEach(cb=>cb.checked=false);
+    setTimeout(()=>showSec('manage-tests'), 800);
+  } catch(e) { errEl.textContent = e.message; errEl.style.display='block'; }
+  finally { btn.textContent='📋 Publish Assessment →'; btn.disabled=false; }
+}
+
+// ── Manage Tests ───────────────────────────────────────────────────────────
+async function loadManageTests() {
+  const container = document.getElementById('manage-tests-list');
+  container.innerHTML = '<div style="text-align:center;padding:3rem;color:var(--muted)">Loading...</div>';
+  try {
+    const statusFilter = document.getElementById('mt-status-filter').value;
+    const url = statusFilter ? `/tests?status=${statusFilter}` : '/tests';
+    const tests = await api('GET', url);
+    if (!tests?.length) { container.innerHTML='<div style="text-align:center;padding:3rem;color:var(--muted)">No assessments found. <a href="#" onclick="showSec(\'create-test\')" style="color:var(--purple)">Create one →</a></div>'; return; }
+    container.innerHTML = tests.map(t=>{
+      const statusColor = {upcoming:'var(--amber)',active:'var(--green)',completed:'var(--purple)'}[t.status]||'var(--muted)';
+      const exList = (t.exercises||[]).map(e=>fmtEx(e.type||e)).join(', ');
+      return `<div class="test-card">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem">
+          <div style="flex:1;min-width:220px">
+            <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.35rem;flex-wrap:wrap">
+              <span style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:.5px">${t.name}</span>
+              <span class="badge badge-${t.status==='active'?'green':t.status==='completed'?'purple':'amber'}" style="font-size:.6rem">${t.status.toUpperCase()}</span>
+            </div>
+            <div style="font-size:.8rem;color:var(--muted);margin-bottom:.4rem">
+              <span style="margin-right:.75rem">🏅 ${t.sport||'—'}</span>
+              <span style="margin-right:.75rem">📅 ${t.scheduled_date} ${t.start_time}</span>
+              <span style="margin-right:.75rem">⏱ ${t.duration_minutes}min</span>
+              <span>👥 <strong style="color:var(--text)">${t.participant_count||0}</strong> registered</span>
+            </div>
+            <div style="font-size:.75rem;color:var(--muted)">Exercises: ${exList||'TBD'}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:.5rem;align-items:flex-end">
+            <div style="display:flex;align-items:center;gap:.75rem;font-size:.8rem">
+              <span style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--muted);text-transform:uppercase">Status:</span>
+              <span class="badge badge-${t.status==='active'?'green':t.status==='completed'?'purple':'amber'}" style="font-size:.7rem;font-weight:600;cursor:help" title="Automatically updated based on scheduled date and time">🔄 ${t.status.toUpperCase()}</span>
+            </div>
+            <div style="display:flex;gap:.5rem">
+              <button class="btn btn-ghost btn-sm" onclick="loadTestParticipants('${t.id}','${t.name}')">👥 Participants</button>
+              <button class="btn btn-ghost btn-sm" onclick="goToLeaderboard('${t.id}')">🏆 Leaderboard</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) { container.innerHTML=`<div style="text-align:center;padding:2rem;color:var(--red)">${e.message}</div>`; }
+}
+
+
+async function loadTestParticipants(testId, testName) {
+  try {
+    const participants = await api('GET', `/tests/${testId}/participants`);
+    if (!participants?.length) { toast(`No participants registered for "${testName}" yet`,'ok'); return; }
+    const names = participants.map(p=>`${p.name} (${p.email})`).join('\n');
+    alert(`Participants for "${testName}" (${participants.length}):\n\n${names}`);
+  } catch(e) { toast(e.message,'err'); }
+}
+
+function goToLeaderboard(testId) {
+  showSec('leaderboard-admin');
+  setTimeout(()=>{ document.getElementById('alb-test-select').value=testId; loadAdminLeaderboard(); }, 100);
+}
+
+// ── Admin Leaderboard ──────────────────────────────────────────────────────
+async function populateAdminTestSelect() {
+  try {
+    const tests = await api('GET', '/tests');
+    const sel = document.getElementById('alb-test-select');
+    const current = sel.value;
+    sel.innerHTML = '<option value="">— Select an Assessment —</option>';
+    (tests||[]).forEach(t=>{
+      const opt=document.createElement('option');
+      opt.value=t.id; opt.textContent=`${t.name} (${t.sport||'General'}) — ${t.status}`;
+      sel.appendChild(opt);
+    });
+    if (current) sel.value = current;
+  } catch(e) { console.error(e); }
+}
+
+async function loadAdminLeaderboard() {
+  const testId = document.getElementById('alb-test-select').value;
+  const body = document.getElementById('admin-leaderboard-body');
+  if (!testId) { body.innerHTML='<div style="text-align:center;padding:3rem;color:var(--muted)">Select an assessment to view rankings.</div>'; return; }
+  body.innerHTML = '<div style="text-align:center;padding:2rem;color:var(--muted)">Loading...</div>';
+  try {
+    const entries = await api('GET', `/tests/${testId}/leaderboard`);
+    if (!entries?.length) { body.innerHTML='<div class="card" style="text-align:center;padding:2rem;color:var(--muted)">No results submitted yet for this assessment.</div>'; return; }
+    let shortlisted = new Set(JSON.parse(localStorage.getItem('shortlisted_'+testId)||'[]'));
+    const renderTable = () => {
+      body.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+          <div style="font-size:.85rem;color:var(--muted)">${entries.length} athlete${entries.length>1?'s':''} · ${shortlisted.size} shortlisted</div>
+          <button class="btn btn-ghost btn-sm" onclick="exportShortlist('${testId}')">📥 Export Shortlist</button>
+        </div>
+        <div class="card"><table class="tbl">
+        <thead><tr><th>Rank</th><th>Athlete</th><th>Score</th><th>Grade</th><th>Reps</th><th>Form</th><th>Level</th><th>Status</th><th>Recording</th><th>Shortlist</th></tr></thead>
+        <tbody>${entries.map(e=>{
+          const medal=e.rank===1?'🥇':e.rank===2?'🥈':e.rank===3?'🥉':'';
+          const isSL = shortlisted.has(e.user_id);
+          const canWatch = !!e.session_id && (e.video_available !== false);
+          return `<tr>
+            <td><strong style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem">${medal}${e.rank}</strong></td>
+            <td><div style="font-weight:600">${e.name}</div><div style="font-size:.72rem;color:var(--muted)">${e.email||''}</div></td>
+            <td><strong style="font-family:'Bebas Neue',sans-serif;font-size:1.25rem;color:var(--purple)">${e.score}</strong><span style="font-size:.7rem;color:var(--muted)">/100</span></td>
+            <td><span class="badge ${gCol(e.form_grade)}">${e.form_grade||'—'}</span></td>
+            <td>${e.total_reps||'—'}</td>
+            <td>${sBar(e.avg_correctness_score)}</td>
+            <td><span class="badge ${lCol(e.fitness_level)}">${e.fitness_level||'—'}</span></td>
+            <td>${e.cheat_detected?'<span class="badge badge-red">⚠️ Flagged</span>':'<span class="badge badge-green">✓ Clean</span>'}</td>
+            <td>${canWatch?`<button class="btn btn-ghost btn-sm" onclick="openLeaderboardVideo('${e.session_id}','${String(e.name||'Athlete').replace(/'/g,"\\'")}')">▶ Watch</button>`:'<span style="font-size:.74rem;color:var(--muted)">No video</span>'}</td>
+            <td><span class="shortlist-badge ${isSL?'shortlisted':''}" onclick="toggleShortlist('${testId}','${e.user_id}',this)">${isSL?'★ Shortlisted':'☆ Shortlist'}</span></td>
+          </tr>`;
+        }).join('')}</tbody></table></div>`;
+    };
+    renderTable();
+    window._lbEntries = entries;
+    window._lbTestId  = testId;
+  } catch(e) { body.innerHTML=`<div style="text-align:center;padding:2rem;color:var(--red)">${e.message}</div>`; }
+}
+
+function toggleShortlist(testId, userId, el) {
+  let sl = new Set(JSON.parse(localStorage.getItem('shortlisted_'+testId)||'[]'));
+  if (sl.has(userId)) { sl.delete(userId); el.classList.remove('shortlisted'); el.textContent='☆ Shortlist'; }
+  else                { sl.add(userId);    el.classList.add('shortlisted');    el.textContent='★ Shortlisted'; }
+  localStorage.setItem('shortlisted_'+testId, JSON.stringify([...sl]));
+}
+
+function exportShortlist(testId) {
+  const sl = new Set(JSON.parse(localStorage.getItem('shortlisted_'+testId)||'[]'));
+  const entries = (window._lbEntries||[]).filter(e=>sl.has(e.user_id));
+  if (!entries.length) { toast('No athletes shortlisted yet','err'); return; }
+  const csv = 'Rank,Name,Email,Score,Grade,Level\n' + entries.map(e=>`${e.rank},"${e.name}","${e.email||''}",${e.score},${e.form_grade||''},${e.fitness_level||''}`).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = `shortlist_${testId}.csv`; a.click();
+  toast(`Exported ${entries.length} shortlisted athletes`,'ok');
+}
+
+let lbVideoObjectUrl = null;
+async function openLeaderboardVideo(sessionId, athleteName) {
+  const modal = document.getElementById('lb-video-modal');
+  const title = document.getElementById('lb-video-title');
+  const player = document.getElementById('lb-video-player');
+  if (!modal || !title || !player) return;
+
+  title.textContent = `Test Recording — ${athleteName || 'Athlete'}`;
+  modal.classList.add('open');
+  player.removeAttribute('src');
+  player.load();
+
+  try {
+    const res = await fetch(`${API}/sessions/${sessionId}/video`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error(`Unable to load video (${res.status})`);
+    const blob = await res.blob();
+    if (lbVideoObjectUrl) URL.revokeObjectURL(lbVideoObjectUrl);
+    lbVideoObjectUrl = URL.createObjectURL(blob);
+    player.src = lbVideoObjectUrl;
+    await player.play().catch(()=>{});
+  } catch (e) {
+    closeLeaderboardVideo();
+    toast(e.message || 'Failed to load recording', 'err');
+  }
+}
+
+function closeLeaderboardVideo(evt) {
+  if (evt && evt.target && evt.target.id !== 'lb-video-modal') return;
+  const modal = document.getElementById('lb-video-modal');
+  const player = document.getElementById('lb-video-player');
+  if (player) {
+    player.pause();
+    player.removeAttribute('src');
+    player.load();
+  }
+  if (lbVideoObjectUrl) {
+    URL.revokeObjectURL(lbVideoObjectUrl);
+    lbVideoObjectUrl = null;
+  }
+  modal?.classList.remove('open');
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function icon(t){return{pushup:'💪',squat:'🏋️',vertical_jump:'🦘',jumping_jack:'⭐',situp:'🤸',lunge:'🚶'}[t]||'🏃';}
+function fmtEx(t){return{pushup:'Push-ups',squat:'Squats',vertical_jump:'Vertical Jump',jumping_jack:'Jumping Jacks',situp:'Sit-ups',lunge:'Lunges'}[t]||t;}
+function fmtDate(d){if(!d)return'—';return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+function sBar(s){const c=s>=80?'var(--green)':s>=60?'var(--amber)':'var(--red)';return`<div style="display:flex;align-items:center;gap:.5rem"><div class="prog-bar" style="width:65px"><div class="prog-fill" style="width:${s?.toFixed(0)||0}%;background:${c}"></div></div><span style="font-size:.75rem;color:var(--muted)">${s?.toFixed(0)||0}%</span></div>`;}
+function lCol(l){return{Advanced:'badge-green',Intermediate:'badge-cyan',Beginner:'badge-amber','Needs Work':'badge-red'}[l]||'badge-amber';}
+function gCol(g){return'AB'.includes(g)?'badge-green':g==='C'?'badge-amber':'badge-red';}
+function toast(msg,type='ok'){const el=document.createElement('div');el.className=`toast ${type}`;el.innerHTML=`${type==='ok'?'✅':'❌'} ${msg}`;document.getElementById('toast-c').appendChild(el);setTimeout(()=>el.remove(),4000);}
+</script>
+</body>
+</html>
