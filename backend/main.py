@@ -6,7 +6,7 @@ Database: athleteai
 Collections: users, test_sessions,processing_jobs, analysis_results
 """
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, BackgroundTasks
+from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, BackgroundTasks, Form
 from fastapi.responses import FileResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
@@ -291,6 +291,10 @@ ALLOWED = {"video/mp4","video/quicktime","video/webm","video/x-msvideo"}
 async def upload_video(background_tasks: BackgroundTasks,
                        exercise_type: str = "pushup",
                        test_id: Optional[str] = None,
+                       live_total_reps: Optional[int] = Form(None),
+                       live_valid_reps: Optional[int] = Form(None),
+                       live_form_accuracy: Optional[float] = Form(None),
+                       live_feedback: Optional[str] = Form(None),
                        file: UploadFile = File(...),
                        user=Depends(get_current_user)):
     if file.content_type not in ALLOWED:
@@ -304,10 +308,33 @@ async def upload_video(background_tasks: BackgroundTasks,
     vpath.write_bytes(content)
     now = datetime.utcnow()
 
+    # Optional live AI stats from browser-side pose tracking.
+    live_total = int(live_total_reps or 0)
+    live_valid = int(live_valid_reps or 0)
+    live_total = max(0, live_total)
+    live_valid = max(0, min(live_valid, live_total))
+    try:
+        live_form = float(live_form_accuracy) if live_form_accuracy is not None else None
+    except (TypeError, ValueError):
+        live_form = None
+    if live_form is not None:
+        # Supports values in either [0,1] or [0,100].
+        if live_form <= 1.0:
+            live_form = live_form * 100.0
+        live_form = max(0.0, min(100.0, live_form))
+    live_meta = {
+        "total_reps": live_total,
+        "valid_reps": live_valid,
+        "form_accuracy": round(live_form, 1) if live_form is not None else None,
+        "feedback": (live_feedback or "")[:280],
+        "captured_at": now,
+    }
+
     await db.test_sessions.insert_one({
         "_id": sid, "user_id": user["user_id"], "exercise_type": exercise_type,
         "video_path": str(vpath), "status": "processing",
         "test_id": test_id,
+        "live_pose_input": live_meta,
         "created_at": now, "completed_at": None,
     })
     await db.processing_jobs.insert_one({
@@ -331,6 +358,8 @@ async def process_video_job(jid, sid, vpath, exercise_type, user_id):
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(None, lambda: VideoProcessor().process_video(vpath, exercise_type))
         rd = result.__dict__
+        session_doc = await db.test_sessions.find_one({"_id": sid}, {"live_pose_input": 1})
+        live_pose_input = (session_doc or {}).get("live_pose_input") or {}
 
         await prog(90)
         rid = str(uuid.uuid4()); pm = rd.get("performance_metrics", {})
@@ -411,6 +440,20 @@ async def process_video_job(jid, sid, vpath, exercise_type, user_id):
                 "history_window": len(recent_same),
             },
             "performance_metrics": pm,
+            "live_pose_input": {
+                "total_reps": int(live_pose_input.get("total_reps") or 0),
+                "valid_reps": int(live_pose_input.get("valid_reps") or 0),
+                "form_accuracy": live_pose_input.get("form_accuracy"),
+                "feedback": live_pose_input.get("feedback", ""),
+            },
+            "live_vs_backend": {
+                "rep_delta": int(rd.get("total_reps", 0) or 0) - int(live_pose_input.get("total_reps") or 0),
+                "valid_rep_delta": int(rd.get("total_reps", 0) or 0) - int(live_pose_input.get("valid_reps") or 0),
+                "form_delta": (
+                    round(float(current_form) - float(live_pose_input.get("form_accuracy")), 1)
+                    if live_pose_input.get("form_accuracy") is not None else None
+                ),
+            },
             "created_at": datetime.utcnow(),
         })
         await db.test_sessions.update_one({"_id": sid},

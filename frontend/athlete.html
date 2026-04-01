@@ -86,7 +86,31 @@
             <!-- Camera Preview (hidden until permission granted) -->
             <div id="camera-section" class="hidden">
               <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:1rem">
-                <video id="camera-preview" style="width:100%;display:block;background:#000;border-radius:10px" autoplay playsinline></video>
+                <div id="live-ai-wrap" style="position:relative">
+                  <video id="camera-preview" style="width:100%;display:block;background:#000;border-radius:10px" autoplay playsinline></video>
+                  <canvas id="pose-overlay" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none"></canvas>
+                </div>
+              </div>
+              <div class="card" style="padding:1rem;margin-bottom:1rem;background:var(--surface2)">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:.7rem">
+                  <div style="font-family:'Bebas Neue',sans-serif;letter-spacing:.6px">Live AI Pose Detection</div>
+                  <span id="live-ai-status" class="badge badge-amber">Starting...</span>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.6rem;margin-bottom:.7rem">
+                  <div style="background:var(--surface3);border:1px solid var(--border);border-radius:8px;padding:.55rem .5rem;text-align:center">
+                    <div id="live-total" style="font-family:'Bebas Neue',sans-serif;font-size:1.5rem;line-height:1">0</div>
+                    <div style="font-size:.62rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase">Total Reps</div>
+                  </div>
+                  <div style="background:var(--surface3);border:1px solid var(--border);border-radius:8px;padding:.55rem .5rem;text-align:center">
+                    <div id="live-valid" style="font-family:'Bebas Neue',sans-serif;font-size:1.5rem;line-height:1;color:var(--green)">0</div>
+                    <div style="font-size:.62rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase">Valid Reps</div>
+                  </div>
+                  <div style="background:var(--surface3);border:1px solid var(--border);border-radius:8px;padding:.55rem .5rem;text-align:center">
+                    <div id="live-form" style="font-family:'Bebas Neue',sans-serif;font-size:1.5rem;line-height:1;color:var(--cyan)">0%</div>
+                    <div style="font-size:.62rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase">Form</div>
+                  </div>
+                </div>
+                <div id="live-feedback" style="font-size:.78rem;color:var(--muted)">Enable camera to start AI feedback.</div>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem">
                 <button class="btn btn-primary" id="record-btn" style="width:100%;padding:.8rem" onclick="startRecording()">⏺️ Start Recording</button>
@@ -114,6 +138,22 @@
                 <button type="button" class="btn btn-primary" style="padding:.65rem 1.2rem;font-size:.9rem;align-self:flex-start" onclick="document.getElementById('upload-input').click()">📁 Choose Video File</button>
                 <input type="file" id="upload-input" accept="video/mp4,video/webm,video/quicktime,video/x-msvideo" onchange="handleFileUpload(this)" style="display:none">
               </div>
+            </div>
+          </div>
+          <div class="card" style="margin-bottom:1rem">
+            <div class="section-title" style="margin-bottom:1rem">3 — Or Upload Existing Video (Testing)</div>
+            <label class="upload-zone" for="upload-video-input" style="display:block">
+              <div style="font-size:2rem;margin-bottom:.6rem">📁</div>
+              <div style="font-weight:600;margin-bottom:.35rem">Choose a video file</div>
+              <div style="font-size:.8rem;color:var(--muted)">Supports MP4, MOV, WEBM, AVI</div>
+              <input id="upload-video-input" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-msvideo" onchange="handleVideoUpload(event)">
+            </label>
+            <div id="upload-file-info" class="hidden" style="margin-top:1rem;background:var(--surface2);border:1px solid var(--green);border-radius:8px;padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between">
+              <div>
+                <div style="font-weight:500;font-size:.875rem;color:var(--green)">✓ Upload selected</div>
+                <div style="font-size:.75rem;color:var(--muted)" id="upload-file-meta"></div>
+              </div>
+              <button class="btn btn-ghost btn-sm" onclick="clearUploadedVideo()" style="color:var(--red)">✕ Clear</button>
             </div>
           </div>
           <button class="btn btn-primary" style="width:100%;padding:1rem;font-size:1rem" id="submit-btn" onclick="submitVideo()" disabled>🚀 Analyze Video</button>
@@ -248,6 +288,36 @@ const API = 'http://localhost:8000/api';
 const token = localStorage.getItem('token');
 const user  = JSON.parse(localStorage.getItem('user') || 'null');
 let selectedEx = 'pushup', selectedFile = null, charts = {};
+const POSE_MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task';
+
+const KP = {
+  nose: 0,
+  left_shoulder: 11,
+  right_shoulder: 12,
+  left_elbow: 13,
+  right_elbow: 14,
+  left_wrist: 15,
+  right_wrist: 16,
+  left_hip: 23,
+  right_hip: 24,
+  left_knee: 25,
+  right_knee: 26,
+  left_ankle: 27,
+  right_ankle: 28,
+};
+
+let poseLandmarker = null;
+let vision = null;
+let detectorRunning = false;
+let detectorRaf = null;
+let lastVideoTime = -1;
+let liveStats = {
+  totalReps: 0,
+  validReps: 0,
+  formAccuracy: 0,
+  feedback: 'Enable camera to start AI feedback.',
+  state: { phase: 'up', minAngle: 180, maxAngle: 0, baselineAnkleY: null },
+};
 
 // Guard — redirect if not logged in or wrong role
 if (!token || !user) { window.location.href = 'login.html'; }
@@ -414,10 +484,287 @@ function renderDist(res) {
 function selectEx(el) {
   document.querySelectorAll('.ex-btn').forEach(b=>b.classList.remove('selected'));
   el.classList.add('selected'); selectedEx = el.dataset.ex;
+  resetLiveStats();
 }
 
 // ── Camera Recording ───────────────────────────────────────────────────────
 let mediaStream = null, mediaRecorder = null, recordedChunks = [];
+
+function avg(a, b) { return (a + b) / 2; }
+
+function angle3(a, b, c) {
+  if (!a || !b || !c) return null;
+  const abx = a.x - b.x, aby = a.y - b.y;
+  const cbx = c.x - b.x, cby = c.y - b.y;
+  const dot = abx * cbx + aby * cby;
+  const den = Math.sqrt(abx * abx + aby * aby) * Math.sqrt(cbx * cbx + cby * cby);
+  if (!den) return null;
+  const cos = Math.max(-1, Math.min(1, dot / den));
+  return Math.acos(cos) * (180 / Math.PI);
+}
+
+function setLiveStatus(text, badge = 'badge-amber') {
+  const el = document.getElementById('live-ai-status');
+  if (!el) return;
+  el.className = `badge ${badge}`;
+  el.textContent = text;
+}
+
+function updateLivePanel() {
+  document.getElementById('live-total').textContent = String(liveStats.totalReps);
+  document.getElementById('live-valid').textContent = String(liveStats.validReps);
+  document.getElementById('live-form').textContent = `${Math.round(liveStats.formAccuracy * 100)}%`;
+  document.getElementById('live-feedback').textContent = liveStats.feedback || 'Tracking movement...';
+}
+
+function resetLiveStats() {
+  liveStats = {
+    totalReps: 0,
+    validReps: 0,
+    formAccuracy: 0,
+    feedback: 'Tracking will begin when pose is visible.',
+    state: { phase: 'up', minAngle: 180, maxAngle: 0, baselineAnkleY: null },
+  };
+  updateLivePanel();
+}
+
+function landmarkPoint(landmarks, idx) {
+  const lm = landmarks[idx];
+  if (!lm) return null;
+  return { x: lm.x, y: lm.y, z: lm.z, vis: lm.visibility ?? 1 };
+}
+
+function meanAngle(landmarks, triples) {
+  const vals = [];
+  for (const [a, b, c] of triples) {
+    const p1 = landmarkPoint(landmarks, KP[a]);
+    const p2 = landmarkPoint(landmarks, KP[b]);
+    const p3 = landmarkPoint(landmarks, KP[c]);
+    if (p1 && p2 && p3 && p1.vis > 0.45 && p2.vis > 0.45 && p3.vis > 0.45) {
+      const ang = angle3(p1, p2, p3);
+      if (Number.isFinite(ang)) vals.push(ang);
+    }
+  }
+  if (!vals.length) return null;
+  return vals.reduce((s, v) => s + v, 0) / vals.length;
+}
+
+function analyzeJumpingJack(landmarks) {
+  const lw = landmarkPoint(landmarks, KP.left_wrist);
+  const rw = landmarkPoint(landmarks, KP.right_wrist);
+  const la = landmarkPoint(landmarks, KP.left_ankle);
+  const ra = landmarkPoint(landmarks, KP.right_ankle);
+  const ls = landmarkPoint(landmarks, KP.left_shoulder);
+  const rs = landmarkPoint(landmarks, KP.right_shoulder);
+  if (!lw || !rw || !la || !ra || !ls || !rs) {
+    return { form: 0.5, feedback: 'Keep full body visible for jumping jacks.' };
+  }
+  const shoulderW = Math.max(1e-4, Math.abs(ls.x - rs.x));
+  const handSpan = Math.abs(lw.x - rw.x) / shoulderW;
+  const footSpan = Math.abs(la.x - ra.x) / shoulderW;
+  const open = handSpan > 2.1 && footSpan > 1.7;
+  const closed = handSpan < 1.3 && footSpan < 1.2;
+  if (liveStats.state.phase === 'closed' && open) liveStats.state.phase = 'open';
+  if (liveStats.state.phase !== 'closed' && closed) {
+    liveStats.state.phase = 'closed';
+    liveStats.totalReps += 1;
+    const form = Math.min(1, Math.max(0.55, (handSpan / 2.5 + footSpan / 2.1) / 2));
+    if (form >= 0.85) liveStats.validReps += 1;
+    liveStats.formAccuracy = liveStats.formAccuracy === 0 ? form : avg(liveStats.formAccuracy, form);
+  }
+  const form = Math.min(1, (Math.min(handSpan / 2.3, 1) + Math.min(footSpan / 1.9, 1)) / 2);
+  return { form, feedback: open ? 'Great extension. Return to closed stance.' : 'Open arms and legs wider.' };
+}
+
+function analyzeVerticalJump(landmarks) {
+  const la = landmarkPoint(landmarks, KP.left_ankle);
+  const ra = landmarkPoint(landmarks, KP.right_ankle);
+  const lk = landmarkPoint(landmarks, KP.left_knee);
+  const rk = landmarkPoint(landmarks, KP.right_knee);
+  if (!la || !ra || !lk || !rk) return { form: 0.55, feedback: 'Keep knees and ankles visible.' };
+
+  const ankleY = (la.y + ra.y) / 2;
+  const kneeAngle = meanAngle(landmarks, [
+    ['left_hip', 'left_knee', 'left_ankle'],
+    ['right_hip', 'right_knee', 'right_ankle'],
+  ]);
+  if (liveStats.state.baselineAnkleY == null) liveStats.state.baselineAnkleY = ankleY;
+
+  const baseline = liveStats.state.baselineAnkleY;
+  const jumpDelta = baseline - ankleY;
+  if (liveStats.state.phase !== 'air' && jumpDelta > 0.05) {
+    liveStats.state.phase = 'air';
+    liveStats.totalReps += 1;
+    const form = kneeAngle ? Math.min(1, Math.max(0.6, kneeAngle / 165)) : 0.7;
+    if (form >= 0.85) liveStats.validReps += 1;
+    liveStats.formAccuracy = liveStats.formAccuracy === 0 ? form : avg(liveStats.formAccuracy, form);
+  }
+  if (liveStats.state.phase === 'air' && jumpDelta < 0.02) liveStats.state.phase = 'ground';
+  liveStats.state.baselineAnkleY = baseline * 0.97 + ankleY * 0.03;
+
+  return { form: Math.min(1, Math.max(0.55, 0.6 + jumpDelta * 5)), feedback: 'Explode upward, then land softly.' };
+}
+
+function analyzeRepByAngle(landmarks, config) {
+  const angle = meanAngle(landmarks, config.triples);
+  if (angle == null) {
+    return { form: 0.5, feedback: 'Adjust camera so key joints stay visible.' };
+  }
+
+  liveStats.state.minAngle = Math.min(liveStats.state.minAngle, angle);
+  liveStats.state.maxAngle = Math.max(liveStats.state.maxAngle, angle);
+  const st = liveStats.state;
+  if (st.phase === 'up' && angle < config.down + 10) st.phase = 'downward';
+  if (st.phase === 'downward' && angle < config.down) st.phase = 'bottom';
+  if (st.phase === 'bottom' && angle > config.down + 10) st.phase = 'upward';
+
+  if (st.phase === 'upward' && angle > config.up) {
+    st.phase = 'up';
+    liveStats.totalReps += 1;
+    const rom = Math.max(0, Math.min(1, (config.up - st.minAngle) / Math.max(1, config.up - config.down)));
+    const lockout = Math.max(0, Math.min(1, (st.maxAngle - config.up + 8) / 16));
+    const form = Math.max(0.5, Math.min(1, 0.75 * rom + 0.25 * lockout));
+    if (form >= 0.85) liveStats.validReps += 1;
+    liveStats.formAccuracy = liveStats.formAccuracy === 0 ? form : avg(liveStats.formAccuracy, form);
+    st.minAngle = angle;
+    st.maxAngle = angle;
+  }
+
+  const curForm = Math.max(0.45, Math.min(1, (config.up - angle + 70) / 120));
+  return { form: curForm, feedback: config.feedback };
+}
+
+function analyzePoseFrame(landmarks) {
+  if (selectedEx === 'jumping_jack') return analyzeJumpingJack(landmarks);
+  if (selectedEx === 'vertical_jump') return analyzeVerticalJump(landmarks);
+  if (selectedEx === 'pushup') {
+    return analyzeRepByAngle(landmarks, {
+      triples: [['left_shoulder', 'left_elbow', 'left_wrist'], ['right_shoulder', 'right_elbow', 'right_wrist']],
+      down: 95,
+      up: 160,
+      feedback: 'Keep elbows tracking back and reach full lockout.',
+    });
+  }
+  if (selectedEx === 'situp') {
+    return analyzeRepByAngle(landmarks, {
+      triples: [['left_shoulder', 'left_hip', 'left_knee'], ['right_shoulder', 'right_hip', 'right_knee']],
+      down: 120,
+      up: 158,
+      feedback: 'Curl up fully, then return with control.',
+    });
+  }
+  if (selectedEx === 'lunge') {
+    return analyzeRepByAngle(landmarks, {
+      triples: [['left_hip', 'left_knee', 'left_ankle'], ['right_hip', 'right_knee', 'right_ankle']],
+      down: 98,
+      up: 156,
+      feedback: 'Drop knee deeper and keep torso upright.',
+    });
+  }
+  return analyzeRepByAngle(landmarks, {
+    triples: [['left_hip', 'left_knee', 'left_ankle'], ['right_hip', 'right_knee', 'right_ankle']],
+    down: 100,
+    up: 160,
+    feedback: 'Go lower and drive up strongly each rep.',
+  });
+}
+
+function drawPose(landmarks) {
+  const video = document.getElementById('camera-preview');
+  const canvas = document.getElementById('pose-overlay');
+  if (!video || !canvas) return;
+  const w = video.videoWidth || 640;
+  const h = video.videoHeight || 480;
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = 'rgba(0, 212, 255, 0.9)';
+  for (const lm of landmarks) {
+    if ((lm.visibility ?? 1) < 0.45) continue;
+    const x = lm.x * w;
+    const y = lm.y * h;
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+async function ensurePoseDetector() {
+  if (poseLandmarker) return true;
+  try {
+    setLiveStatus('Loading model...', 'badge-amber');
+    if (!vision) {
+      vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14');
+    }
+    const filesetResolver = await vision.FilesetResolver.forVisionTasks('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm');
+    poseLandmarker = await vision.PoseLandmarker.createFromOptions(filesetResolver, {
+      baseOptions: { modelAssetPath: POSE_MODEL_URL, delegate: 'GPU' },
+      runningMode: 'VIDEO',
+      numPoses: 1,
+      minPoseDetectionConfidence: 0.5,
+      minPosePresenceConfidence: 0.5,
+      minTrackingConfidence: 0.5,
+    });
+    setLiveStatus('AI ready', 'badge-green');
+    return true;
+  } catch (e) {
+    console.error('Pose detector init failed', e);
+    setLiveStatus('AI unavailable', 'badge-red');
+    liveStats.feedback = 'Live AI failed to load. You can still record and upload.';
+    updateLivePanel();
+    return false;
+  }
+}
+
+function stopLivePoseDetection() {
+  detectorRunning = false;
+  if (detectorRaf) cancelAnimationFrame(detectorRaf);
+  detectorRaf = null;
+  lastVideoTime = -1;
+  const canvas = document.getElementById('pose-overlay');
+  if (canvas) {
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+}
+
+async function runDetectorFrame() {
+  if (!detectorRunning || !poseLandmarker) return;
+  const video = document.getElementById('camera-preview');
+  if (!video || video.readyState < 2) {
+    detectorRaf = requestAnimationFrame(runDetectorFrame);
+    return;
+  }
+
+  if (video.currentTime !== lastVideoTime) {
+    lastVideoTime = video.currentTime;
+    const result = poseLandmarker.detectForVideo(video, performance.now());
+    const landmarks = result?.landmarks?.[0];
+    if (landmarks?.length) {
+      setLiveStatus('Tracking', 'badge-green');
+      const frame = analyzePoseFrame(landmarks);
+      liveStats.feedback = frame.feedback;
+      const blended = liveStats.formAccuracy === 0 ? frame.form : (liveStats.formAccuracy * 0.85 + frame.form * 0.15);
+      liveStats.formAccuracy = Math.max(0, Math.min(1, blended));
+      updateLivePanel();
+      drawPose(landmarks);
+    } else {
+      setLiveStatus('No pose', 'badge-amber');
+      liveStats.feedback = 'Step back so full body is visible.';
+      updateLivePanel();
+    }
+  }
+  detectorRaf = requestAnimationFrame(runDetectorFrame);
+}
+
+async function startLivePoseDetection() {
+  if (!(await ensurePoseDetector())) return;
+  resetLiveStats();
+  detectorRunning = true;
+  runDetectorFrame();
+}
+
 function requestCameraAccess() {
   const permBtn = document.getElementById('camera-permission');
   const camSec = document.getElementById('camera-section');
@@ -427,6 +774,7 @@ function requestCameraAccess() {
 }
 
 function closeCameraAccess() {
+  stopLivePoseDetection();
   stopCameraPreview();
   const permBtn = document.getElementById('camera-permission');
   const camSec = document.getElementById('camera-section');
@@ -444,6 +792,8 @@ async function startCameraPreview() {
     });
     const video = document.getElementById('camera-preview');
     video.srcObject = mediaStream;
+    await video.play().catch(()=>{});
+    await startLivePoseDetection();
     toast('Camera ready! Press "Start Recording"','ok');
   } catch(e) {
     toast(`Camera access denied: ${e.message}`,'err');
@@ -452,6 +802,7 @@ async function startCameraPreview() {
 }
 
 function stopCameraPreview() {
+  stopLivePoseDetection();
   if (mediaStream) {
     mediaStream.getTracks().forEach(track => track.stop());
     mediaStream = null;
@@ -460,6 +811,7 @@ function stopCameraPreview() {
 
 async function startRecording() {
   if (!mediaStream) { toast('Camera not ready','err'); return; }
+  resetLiveStats();
   
   recordedChunks = [];
   mediaRecorder = new MediaRecorder(mediaStream, { mimeType: 'video/webm' });
@@ -480,7 +832,7 @@ async function startRecording() {
     document.getElementById('camera-file-size').textContent = (blob.size/1024/1024).toFixed(1)+' MB';
 >>>>>>> a7ad4593b4e3f7812a5f7108abf98b958f96dde2
     document.getElementById('submit-btn').disabled = false;
-    toast('Video recorded and ready for analysis! ✓','ok');
+    toast(`Video recorded! Live AI: ${liveStats.validReps}/${liveStats.totalReps} valid reps`,'ok');
   };
   
   mediaRecorder.start();
@@ -526,6 +878,38 @@ function clearCameraFile() {
 =======
 >>>>>>> a7ad4593b4e3f7812a5f7108abf98b958f96dde2
   document.getElementById('camera-file-info').classList.add('hidden');
+  document.getElementById('upload-file-info').classList.add('hidden');
+  const uploadInput = document.getElementById('upload-video-input');
+  if (uploadInput) uploadInput.value = '';
+  document.getElementById('submit-btn').disabled = true;
+}
+
+function handleVideoUpload(event) {
+  const file = event?.target?.files?.[0];
+  if (!file) return;
+
+  const allowed = ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-msvideo'];
+  if (!allowed.includes(file.type)) {
+    toast('Unsupported format. Use MP4, MOV, WEBM, or AVI.','err');
+    event.target.value = '';
+    return;
+  }
+
+  selectedFile = file;
+  const mb = (file.size / 1024 / 1024).toFixed(1);
+  const meta = `${file.name} • ${mb} MB`;
+  document.getElementById('upload-file-info').classList.remove('hidden');
+  document.getElementById('upload-file-meta').textContent = meta;
+  document.getElementById('camera-file-info').classList.add('hidden');
+  document.getElementById('submit-btn').disabled = false;
+  toast('Video file selected. Ready for analysis.','ok');
+}
+
+function clearUploadedVideo() {
+  selectedFile = null;
+  const uploadInput = document.getElementById('upload-video-input');
+  if (uploadInput) uploadInput.value = '';
+  document.getElementById('upload-file-info').classList.add('hidden');
   document.getElementById('submit-btn').disabled = true;
 }
 
@@ -566,21 +950,52 @@ async function submitVideo() {
   const pit=setInterval(()=>{ p=Math.min(p+Math.random()*7,90); pf.style.width=p+'%'; },500);
   try {
     const form=new FormData(); form.append('file',selectedFile);
+    form.append('live_total_reps', String(liveStats.totalReps || 0));
+    form.append('live_valid_reps', String(liveStats.validReps || 0));
+    form.append('live_form_accuracy', String(liveStats.formAccuracy || 0));
+    form.append('live_feedback', liveStats.feedback || '');
     const testId = document.getElementById('submit-btn').dataset.testId || '';
     const queryParams = `exercise_type=${selectedEx}${testId?`&test_id=${testId}`:''}`;
     const sess=await api('POST',`/sessions/upload?${queryParams}`,form,true);
     if (!sess) throw new Error('Upload failed');
     let tries=0;
-    while(tries<30) {
+    let completed = false;
+    const maxPollTries = 60; // up to ~2 minutes at 2s interval
+    while(tries<maxPollTries) {
       await sleep(2000);
       const job=await api('GET',`/jobs/${sess.job_id}`);
-      if(job?.status==='completed'){pf.style.width='100%';break;}
-      if(job?.status==='failed') throw new Error('Processing failed');
+      if(job?.status==='completed') {
+        completed = true;
+        pf.style.width='100%';
+        break;
+      }
+      if(job?.status==='failed') {
+        throw new Error(job?.error_message ? `Processing failed: ${job.error_message}` : 'Processing failed');
+      }
+
+      // Reflect backend progress if available.
+      if (typeof job?.progress === 'number') {
+        const bounded = Math.max(3, Math.min(95, job.progress));
+        pf.style.width = `${bounded}%`;
+      }
       tries++;
+    }
+    if (!completed) {
+      throw new Error('Video processing is still running. Please retry in a few moments.');
     }
     clearInterval(sit); clearInterval(pit); ol.classList.add('hidden');
     await sleep(200);
-    const result=await api('GET',`/sessions/${sess.session_id}/result`);
+    // Result write can lag just after job completion; retry briefly.
+    let result = null;
+    for (let i = 0; i < 6; i++) {
+      try {
+        result = await api('GET',`/sessions/${sess.session_id}/result`);
+        if (result) break;
+      } catch (e) {
+        if (i === 5) throw e;
+      }
+      await sleep(1200);
+    }
     if(result) showResult(result);
     toast('Analysis complete! 🎉','ok');
     if (testId) { delete document.getElementById('submit-btn').dataset.testId; }
