@@ -7,19 +7,24 @@ Collections: users, test_sessions,processing_jobs, analysis_results
 """
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, BackgroundTasks, Form
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
-import uvicorn, os, uuid, json, hashlib, hmac, base64, asyncio
+import uvicorn, os, uuid, json, hashlib, hmac, base64, asyncio, csv, io
 from datetime import datetime, timedelta
 from pathlib import Path
 from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo.server_api import ServerApi
+try:
+    import certifi
+except ImportError:
+    certifi = None
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 UPLOAD_DIR = Path("./uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
@@ -27,6 +32,9 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "athleteai-secret-key-change-in-produc
 MONGO_URI  = os.environ.get("MONGO_URI", "mongodb://localhost:27017")
 MONGO_DB   = os.environ.get("MONGO_DB", "athleteai")
 SCORING_MODE = os.environ.get("SCORING_MODE", "hybrid")  # hybrid | shadow | rule_only
+MONGO_TLS_ALLOW_INVALID_CERTS = os.environ.get("MONGO_TLS_ALLOW_INVALID_CERTS", "false").lower() == "true"
+MONGO_TLS_ALLOW_INVALID_HOSTNAMES = os.environ.get("MONGO_TLS_ALLOW_INVALID_HOSTNAMES", "false").lower() == "true"
+MONGO_TLS_INSECURE = os.environ.get("MONGO_TLS_INSECURE", "false").lower() == "true"
 
 client = db = None
 status_update_task = None  # Background task for updating test statuses
@@ -46,7 +54,7 @@ async def update_all_test_statuses():
         now = datetime.now()  # Use local time, not UTC
         
         # Get all tests that are not manually marked as completed
-        tests = await db.tests.find({"status": {"$ne": "completed"}}).to_list(None)
+        tests = await db.tests.find({"status": {"$nin": ["completed", "archived"]}}).to_list(None)
         
         for test in tests:
             try:
@@ -88,8 +96,33 @@ async def update_all_test_statuses():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global client, db, status_update_task
-    client = AsyncIOMotorClient(MONGO_URI)
+
+    mongo_client_kwargs = {
+        "serverSelectionTimeoutMS": 30000,
+        "connectTimeoutMS": 30000,
+        "socketTimeoutMS": 30000,
+    }
+    if MONGO_URI.startswith("mongodb+srv://"):
+        mongo_client_kwargs.update({"tls": True, "server_api": ServerApi("1")})
+        if certifi is not None:
+            mongo_client_kwargs["tlsCAFile"] = certifi.where()
+        # Emergency switches for restrictive networks; keep disabled in normal use.
+        if MONGO_TLS_INSECURE or MONGO_TLS_ALLOW_INVALID_CERTS:
+            mongo_client_kwargs["tlsAllowInvalidCertificates"] = True
+        if MONGO_TLS_INSECURE or MONGO_TLS_ALLOW_INVALID_HOSTNAMES:
+            mongo_client_kwargs["tlsAllowInvalidHostnames"] = True
+
+    client = AsyncIOMotorClient(MONGO_URI, **mongo_client_kwargs)
     db = client[MONGO_DB]
+
+    try:
+        await client.admin.command("ping")
+    except Exception as e:
+        print("❌ MongoDB connection failed during startup")
+        print(f"   URI host: {MONGO_URI.split('@')[-1] if '@' in MONGO_URI else MONGO_URI}")
+        print(f"   Hint: verify Atlas Network Access/IP allowlist and TLS settings. ({e})")
+        raise
+
     await db.users.create_index("email", unique=True)
     await db.test_sessions.create_index("user_id")
     await db.processing_jobs.create_index("session_id")
@@ -199,6 +232,260 @@ def sanitize_analysis_doc(doc: dict) -> dict:
     return out
 
 
+def _safe_percent(value, default=0.0):
+    try:
+        return max(0.0, min(100.0, float(value)))
+    except (TypeError, ValueError):
+        return float(default)
+
+
+def _compute_badges(results: list[dict]) -> list[dict]:
+    badges = []
+    total = len(results)
+    if total >= 5:
+        badges.append({"id": "starter", "title": "Getting Started", "description": "Completed 5 or more tests."})
+    if total >= 10:
+        badges.append({"id": "consistent", "title": "Consistency", "description": "Completed 10 or more tests."})
+    avg_score = round(sum(float(r.get("avg_correctness_score", 0) or 0) for r in results) / total, 1) if total else 0.0
+    if avg_score >= 75:
+        badges.append({"id": "form_focus", "title": "Form Focus", "description": f"Average form score reached {avg_score:.1f}% or higher."})
+    if avg_score >= 85:
+        badges.append({"id": "elite", "title": "Elite Form", "description": f"Average form score reached {avg_score:.1f}% or higher."})
+    exercise_counts = {}
+    for r in results:
+        ex = r.get("exercise_type", "unknown")
+        exercise_counts[ex] = exercise_counts.get(ex, 0) + 1
+    for ex, count in exercise_counts.items():
+        if count >= 5:
+            badges.append({"id": f"{ex}-focus", "title": f"{ex.replace('_', ' ').title()} Specialist", "description": f"Logged 5 or more {ex.replace('_', ' ')} sessions."})
+    return badges
+
+
+def _compute_progress_summary(results: list[dict], user_doc: dict | None = None) -> dict:
+    ordered = sorted(results, key=lambda d: d.get("created_at") or "", reverse=True)
+    total_tests = len(ordered)
+    avg_score = round(sum(float(r.get("avg_correctness_score", 0) or 0) for r in ordered) / total_tests, 1) if total_tests else 0.0
+    best_score = round(max((float(r.get("avg_correctness_score", 0) or 0) for r in ordered), default=0.0), 1)
+    best_reps = max((int(r.get("total_reps", 0) or 0) for r in ordered), default=0)
+    exercise_best = {}
+    for r in ordered:
+        ex = r.get("exercise_type", "unknown")
+        score = float(r.get("avg_correctness_score", 0) or 0)
+        if ex not in exercise_best or score > exercise_best[ex]["score"]:
+            exercise_best[ex] = {
+                "exercise_type": ex,
+                "score": round(score, 1),
+                "reps": int(r.get("total_reps", 0) or 0),
+                "date": r.get("created_at"),
+            }
+
+    trend = []
+    for r in ordered[:10]:
+        trend.append({
+            "date": r.get("created_at"),
+            "exercise_type": r.get("exercise_type"),
+            "score": float(r.get("avg_correctness_score", 0) or 0),
+            "reps": int(r.get("total_reps", 0) or 0),
+            "fitness_level": r.get("fitness_level", "Unknown"),
+        })
+
+    recent_window = ordered[:10]
+    previous_window = ordered[10:20]
+    recent_avg = round(sum(float(r.get("avg_correctness_score", 0) or 0) for r in recent_window) / len(recent_window), 1) if recent_window else 0.0
+    previous_avg = round(sum(float(r.get("avg_correctness_score", 0) or 0) for r in previous_window) / len(previous_window), 1) if previous_window else recent_avg
+    delta = round(recent_avg - previous_avg, 1) if previous_window else 0.0
+
+    goals = {
+        "goal_avg_score": user_doc.get("goal_avg_score") if user_doc else None,
+        "goal_tests_per_week": user_doc.get("goal_tests_per_week") if user_doc else None,
+        "goal_primary_exercise": user_doc.get("goal_primary_exercise") if user_doc else None,
+    }
+    goal_progress = None
+    if goals.get("goal_avg_score"):
+        goal_progress = round(min(100.0, (avg_score / float(goals["goal_avg_score"])) * 100), 1) if goals["goal_avg_score"] else None
+
+    badges = _compute_badges(ordered)
+
+    return {
+        "summary": {
+            "total_tests": total_tests,
+            "average_score": avg_score,
+            "best_score": best_score,
+            "best_reps": best_reps,
+            "score_delta": delta,
+            "recent_average": recent_avg,
+        },
+        "goals": goals,
+        "goal_progress": goal_progress,
+        "bests": list(exercise_best.values()),
+        "trend": trend,
+        "badges": badges,
+    }
+
+
+def _build_notifications(results: list[dict], registrations: list[dict], tests: list[dict]) -> list[dict]:
+    notices = []
+    now = datetime.now()
+    if results:
+        latest = sorted(results, key=lambda d: d.get("created_at") or "", reverse=True)[0]
+        created_at = latest.get("created_at")
+        if isinstance(created_at, str):
+            try:
+                created_at = datetime.fromisoformat(created_at)
+            except ValueError:
+                created_at = None
+        if isinstance(created_at, datetime) and (now - created_at) <= timedelta(hours=24):
+            notices.append({"type": "result_ready", "title": "Latest result ready", "message": f"Your {latest.get('exercise_type', 'recent')} result is available.", "timestamp": created_at.isoformat() if created_at else None})
+
+    test_map = {str(t.get("_id")): t for t in tests}
+    for reg in registrations:
+        test = test_map.get(reg.get("test_id"))
+        if not test:
+            continue
+        scheduled_date = test.get("scheduled_date")
+        start_time = test.get("start_time", "00:00")
+        try:
+            scheduled_dt = datetime.strptime(f"{scheduled_date} {start_time}", "%Y-%m-%d %H:%M")
+        except Exception:
+            continue
+        hours_until = (scheduled_dt - now).total_seconds() / 3600
+        if 0 <= hours_until <= 24:
+            notices.append({
+                "type": "reminder",
+                "title": f"Assessment soon: {test.get('name', 'Scheduled test')}",
+                "message": f"Starts in {max(1, int(hours_until))} hour{'s' if hours_until >= 2 else ''}.",
+                "timestamp": scheduled_dt.isoformat(),
+            })
+
+    for badge in _compute_badges(results):
+        notices.append({
+            "type": "milestone",
+            "title": f"Badge unlocked: {badge['title']}",
+            "message": badge["description"],
+            "timestamp": now.isoformat(),
+        })
+
+    return notices[:10]
+
+
+def _csv_download(filename: str, headers: list[str], rows: list[list[object]]) -> Response:
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(headers)
+    writer.writerows(rows)
+    return Response(
+        content=buffer.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _pdf_escape(text: object) -> str:
+    safe = str(text).encode("latin-1", "replace").decode("latin-1")
+    return safe.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+
+def _wrap_pdf_line(text: str, limit: int = 92) -> list[str]:
+    raw = str(text)
+    if len(raw) <= limit:
+        return [raw]
+    chunks = []
+    remaining = raw
+    while len(remaining) > limit:
+        split_at = remaining.rfind(" ", 0, limit)
+        if split_at <= 18:
+            split_at = limit
+        chunks.append(remaining[:split_at].rstrip())
+        remaining = remaining[split_at:].lstrip()
+    if remaining:
+        chunks.append(remaining)
+    return chunks
+
+
+def _build_pdf(title: str, sections: list[tuple[str, list[str]]]) -> bytes:
+    page_width, page_height = 612, 792
+    margin_left = 40
+    margin_top = 52
+    line_height = 12
+    max_lines_per_page = 48
+
+    raw_lines: list[str] = []
+    for heading, lines in sections:
+        raw_lines.append(heading)
+        raw_lines.extend(lines)
+        raw_lines.append("")
+
+    wrapped_lines: list[str] = []
+    for line in raw_lines:
+        if line == "":
+            wrapped_lines.append("")
+            continue
+        wrapped_lines.extend(_wrap_pdf_line(line))
+
+    pages = [wrapped_lines[i:i + max_lines_per_page] for i in range(0, len(wrapped_lines), max_lines_per_page)]
+    if not pages:
+        pages = [[title]]
+
+    objects: list[str] = []
+    page_count = len(pages)
+    page_ids = [4 + i * 2 for i in range(page_count)]
+    content_ids = [5 + i * 2 for i in range(page_count)]
+
+    objects.append("<< /Type /Catalog /Pages 2 0 R >>")
+    objects.append(f"<< /Type /Pages /Kids [{' '.join(f'{pid} 0 R' for pid in page_ids)}] /Count {page_count} >>")
+    objects.append("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+
+    for idx, page_lines in enumerate(pages):
+        stream_lines = [
+            "BT",
+            "/F1 12 Tf",
+            f"{margin_left} {page_height - margin_top} Td",
+            f"({_pdf_escape(title)}) Tj",
+            "/F1 9 Tf",
+        ]
+        for line in page_lines:
+            if line == "":
+                stream_lines.append("0 -10 Td")
+                continue
+            stream_lines.append(f"0 -{line_height} Td")
+            stream_lines.append(f"({_pdf_escape(line)}) Tj")
+        stream_lines.append("ET")
+        stream = "\n".join(stream_lines)
+        content = f"<< /Length {len(stream.encode('utf-8'))} >>\nstream\n{stream}\nendstream"
+        page_obj = (
+            f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 {page_width} {page_height}] "
+            f"/Resources << /Font << /F1 3 0 R >> >> /Contents {content_ids[idx]} 0 R >>"
+        )
+        objects.append(page_obj)
+        objects.append(content)
+
+    pdf = bytearray(b"%PDF-1.4\n")
+    offsets = [0]
+    for obj_id, body in enumerate(objects, start=1):
+        offsets.append(len(pdf))
+        pdf.extend(f"{obj_id} 0 obj\n".encode("utf-8"))
+        pdf.extend(body.encode("utf-8"))
+        pdf.extend(b"\nendobj\n")
+
+    xref_pos = len(pdf)
+    pdf.extend(f"xref\n0 {len(objects) + 1}\n".encode("utf-8"))
+    pdf.extend(b"0000000000 65535 f \n")
+    for off in offsets[1:]:
+        pdf.extend(f"{off:010d} 00000 n \n".encode("utf-8"))
+    pdf.extend(
+        f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_pos}\n%%EOF".encode("utf-8")
+    )
+    return bytes(pdf)
+
+
+def _pdf_download(filename: str, title: str, sections: list[tuple[str, list[str]]]) -> Response:
+    return Response(
+        content=_build_pdf(title, sections),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 # ── Auth helpers ───────────────────────────────────────────────────────────────
 
 def hash_password(p: str) -> str:
@@ -247,6 +534,9 @@ class UpdateProfileRequest(BaseModel):
     age: Optional[int] = None
     weight_kg: Optional[float] = None
     height_cm: Optional[float] = None
+    goal_avg_score: Optional[float] = None
+    goal_tests_per_week: Optional[int] = None
+    goal_primary_exercise: Optional[str] = None
 
 
 # ── Auth endpoints ─────────────────────────────────────────────────────────────
@@ -377,6 +667,8 @@ async def process_video_job(jid, sid, vpath, exercise_type, user_id):
             sum(d.get("total_reps", 0) for d in recent_same) / len(recent_same), 1
         ) if recent_same else None
         jump_vals = [d.get("jump_height_cm") for d in recent_same if d.get("jump_height_cm") is not None]
+
+
         baseline_jump = round(sum(jump_vals) / len(jump_vals), 1) if jump_vals else None
 
         rule_score_val = rd.get("rule_score", rd.get("avg_correctness_score", 0))
@@ -575,6 +867,28 @@ async def session_result(session_id: str, user=Depends(get_current_user)):
     return serialize(sanitize_analysis_doc(doc))
 
 
+@app.get("/api/progress")
+async def athlete_progress(user=Depends(get_current_user)):
+    results = await db.analysis_results.find(
+        {"user_id": user["user_id"]}, {"frame_analyses": 0}
+    ).sort("created_at", -1).to_list(200)
+    user_doc = await db.users.find_one({"_id": user["user_id"]}, {"password_hash": 0})
+    summary = _compute_progress_summary([sanitize_analysis_doc(d) for d in results], user_doc)
+    return summary
+
+
+@app.get("/api/notifications")
+async def athlete_notifications(user=Depends(get_current_user)):
+    results = await db.analysis_results.find(
+        {"user_id": user["user_id"]}, {"frame_analyses": 0}
+    ).sort("created_at", -1).to_list(200)
+    registrations = await db.test_registrations.find({"user_id": user["user_id"]}).to_list(200)
+    test_ids = [r.get("test_id") for r in registrations if r.get("test_id")]
+    tests = await db.tests.find({"_id": {"$in": test_ids}}).to_list(200) if test_ids else []
+    notifications = _build_notifications([sanitize_analysis_doc(d) for d in results], registrations, tests)
+    return {"items": notifications, "count": len(notifications)}
+
+
 # ── Admin ──────────────────────────────────────────────────────────────────────
 
 @app.get("/api/admin/stats")
@@ -611,9 +925,16 @@ async def admin_stats(admin=Depends(require_admin)):
             "recent_activity": recent}
 
 @app.get("/api/admin/athletes")
-async def admin_athletes(age_min: Optional[int]=None, age_max: Optional[int]=None,
-                         fitness_level: Optional[str]=None, exercise_type: Optional[str]=None,
-                         admin=Depends(require_admin)):
+async def admin_athletes(
+    age_min: Optional[int] = None,
+    age_max: Optional[int] = None,
+    fitness_level: Optional[str] = None,
+    exercise_type: Optional[str] = None,
+    q: Optional[str] = None,
+    sort_by: Optional[str] = None,
+    sort_dir: str = "asc",
+    admin=Depends(require_admin),
+):
     uf: dict = {"role": "athlete"}
     if age_min: uf.setdefault("age", {})["$gte"] = age_min
     if age_max: uf.setdefault("age", {})["$lte"] = age_max
@@ -628,17 +949,43 @@ async def admin_athletes(age_min: Optional[int]=None, age_max: Optional[int]=Non
                     "last_test": {"$max": "$created_at"}}}
     ]).to_list(500)
     smap = {d["_id"]: d for d in stats}
-    return [{"id": str(u["_id"]), "name": u["name"], "email": u["email"],
-             "age": u.get("age"), "height_cm": u.get("height_cm"), "weight_kg": u.get("weight_kg"),
-             "total_tests": smap.get(str(u["_id"]), {}).get("total_tests", 0),
-             "avg_score": round(smap[str(u["_id"])]["avg_score"], 1)
-                          if smap.get(str(u["_id"]), {}).get("avg_score") else None,
-             "last_test": smap[str(u["_id"])]["last_test"].isoformat()
-                          if isinstance(smap.get(str(u["_id"]), {}).get("last_test"), datetime) else None}
-            for u in users]
+    rows = []
+    search = q.strip().lower() if q else ""
+    for u in users:
+        stats_doc = smap.get(str(u["_id"]), {})
+        row = {"id": str(u["_id"]), "name": u["name"], "email": u["email"],
+               "age": u.get("age"), "height_cm": u.get("height_cm"), "weight_kg": u.get("weight_kg"),
+               "total_tests": stats_doc.get("total_tests", 0),
+               "avg_score": round(stats_doc.get("avg_score", 0), 1) if stats_doc.get("avg_score") is not None else None,
+               "last_test": stats_doc.get("last_test").isoformat() if isinstance(stats_doc.get("last_test"), datetime) else None}
+        if search:
+            haystack = f"{row['name']} {row['email']}".lower()
+            if search not in haystack:
+                continue
+        rows.append(row)
+
+    reverse = sort_dir.lower() != "asc"
+
+    def athlete_sort_key(item: dict):
+        key = sort_by or "name"
+        if key in {"age", "height_cm", "weight_kg", "total_tests"}:
+            return item.get(key) or 0
+        if key == "avg_score":
+            return item.get(key) or 0
+        if key == "last_test":
+            return item.get(key) or ""
+        return str(item.get(key) or "").lower()
+
+    rows.sort(key=athlete_sort_key, reverse=reverse)
+    return rows
 
 @app.get("/api/admin/authorities")
-async def admin_authorities(admin=Depends(require_admin)):
+async def admin_authorities(
+    q: Optional[str] = None,
+    sort_by: Optional[str] = None,
+    sort_dir: str = "asc",
+    admin=Depends(require_admin),
+):
     """Get all sports authority accounts with their test creation stats"""
     # Fetch all authority users
     authorities = await db.users.find({"role": "authority"}, {"password_hash": 0}).to_list(500)
@@ -668,29 +1015,166 @@ async def admin_authorities(admin=Depends(require_admin)):
     ]).to_list(500)
     participant_map = {d["_id"]: d["total_participants"] for d in participant_stats}
 
-    return [{
-        "id": str(auth["_id"]),
-        "name": auth["name"],
-        "email": auth["email"],
-        "created_at": auth["created_at"].isoformat() if isinstance(auth.get("created_at"), datetime) else None,
-        "tests_created": test_map.get(str(auth["_id"]), 0),
-        "total_participants": participant_map.get(str(auth["_id"]), 0),
-        "status": "Active"
-    } for auth in authorities]
+    rows = []
+    search = q.strip().lower() if q else ""
+    for auth in authorities:
+        row = {
+            "id": str(auth["_id"]),
+            "name": auth["name"],
+            "email": auth["email"],
+            "created_at": auth["created_at"].isoformat() if isinstance(auth.get("created_at"), datetime) else None,
+            "tests_created": test_map.get(str(auth["_id"]), 0),
+            "total_participants": participant_map.get(str(auth["_id"]), 0),
+            "status": "Active",
+        }
+        if search and search not in f"{row['name']} {row['email']}".lower():
+            continue
+        rows.append(row)
+
+    reverse = sort_dir.lower() != "asc"
+
+    def authority_sort_key(item: dict):
+        key = sort_by or "name"
+        if key in {"tests_created", "total_participants"}:
+            return item.get(key) or 0
+        if key == "created_at":
+            return item.get(key) or ""
+        return str(item.get(key) or "").lower()
+
+    rows.sort(key=authority_sort_key, reverse=reverse)
+    return rows
 
 @app.get("/api/admin/results")
-async def admin_all_results(admin=Depends(require_admin)):
-    docs = await db.analysis_results.find({}, {"frame_analyses": 0}).sort("created_at", -1).limit(100).to_list(100)
+async def admin_all_results(
+    q: Optional[str] = None,
+    exercise_type: Optional[str] = None,
+    fitness_level: Optional[str] = None,
+    cheat: Optional[str] = None,
+    sort_by: Optional[str] = None,
+    sort_dir: str = "desc",
+    admin=Depends(require_admin),
+):
+    docs = await db.analysis_results.find({}, {"frame_analyses": 0}).limit(200).to_list(200)
     uid_list = list({d["user_id"] for d in docs})
     umap = {str(u["_id"]): u for u in
             await db.users.find({"_id": {"$in": uid_list}}, {"name": 1, "email": 1}).to_list(200)}
     results = []
+    search = q.strip().lower() if q else ""
     for d in docs:
         s = serialize(sanitize_analysis_doc(d))
         u = umap.get(d["user_id"], {})
         s["athlete_name"] = u.get("name", "Unknown"); s["athlete_email"] = u.get("email", "")
+        if exercise_type and s.get("exercise_type") != exercise_type:
+            continue
+        if fitness_level and s.get("fitness_level") != fitness_level:
+            continue
+        if cheat == "flagged" and not s.get("cheat_detected"):
+            continue
+        if cheat == "clean" and s.get("cheat_detected"):
+            continue
+        if search and search not in f"{s.get('athlete_name','')} {s.get('athlete_email','')} {s.get('exercise_type','')}".lower():
+            continue
         results.append(s)
+
+    reverse = sort_dir.lower() != "asc"
+
+    def result_sort_key(item: dict):
+        key = sort_by or "created_at"
+        if key in {"avg_correctness_score", "total_reps", "jump_height_cm", "estimated_percentile", "confidence_score"}:
+            return item.get(key) or 0
+        if key == "athlete_name":
+            return str(item.get("athlete_name") or "").lower()
+        if key == "exercise_type":
+            return str(item.get("exercise_type") or "").lower()
+        if key == "created_at":
+            return item.get(key) or ""
+        return str(item.get(key) or "").lower()
+
+    results.sort(key=result_sort_key, reverse=reverse)
     return results
+
+
+@app.get("/api/results/export")
+async def export_my_results(
+    format: str = "csv",
+    exercise_type: Optional[str] = None,
+    fitness_level: Optional[str] = None,
+    user=Depends(get_current_user),
+):
+    docs = await db.analysis_results.find(
+        {"user_id": user["user_id"]}, {"frame_analyses": 0}
+    ).sort("created_at", -1).to_list(200)
+    rows = [serialize(sanitize_analysis_doc(d)) for d in docs]
+    if exercise_type:
+        rows = [r for r in rows if r.get("exercise_type") == exercise_type]
+    if fitness_level:
+        rows = [r for r in rows if r.get("fitness_level") == fitness_level]
+    headers = ["Date", "Exercise", "Reps", "Form Score", "Level", "Grade", "Cheat", "Confidence", "Score"]
+    csv_rows = [
+        [
+            r.get("created_at", ""),
+            r.get("exercise_type", ""),
+            r.get("total_reps", 0),
+            r.get("avg_correctness_score", 0),
+            r.get("fitness_level", ""),
+            r.get("form_grade", ""),
+            "Yes" if r.get("cheat_detected") else "No",
+            r.get("confidence_score", 0),
+            r.get("hybrid_form_score", r.get("avg_correctness_score", 0)),
+        ]
+        for r in rows
+    ]
+    if format.lower() == "pdf":
+        sections = [
+            ("Results Summary", [f"Total sessions: {len(rows)}"]),
+            ("Records", [
+                f"{r.get('created_at','')} | {r.get('exercise_type','')} | reps {r.get('total_reps',0)} | score {r.get('avg_correctness_score',0)} | grade {r.get('form_grade','')} | cheat {'yes' if r.get('cheat_detected') else 'no'}"
+                for r in rows
+            ]),
+        ]
+        return _pdf_download("my_results.pdf", "AthleteAI Results Export", sections)
+    return _csv_download("my_results.csv", headers, csv_rows)
+
+
+@app.get("/api/admin/results/export")
+async def export_admin_results(
+    q: Optional[str] = None,
+    exercise_type: Optional[str] = None,
+    fitness_level: Optional[str] = None,
+    cheat: Optional[str] = None,
+    sort_by: Optional[str] = None,
+    sort_dir: str = "desc",
+    format: str = "csv",
+    admin=Depends(require_admin),
+):
+    docs = await admin_all_results(q=q, exercise_type=exercise_type, fitness_level=fitness_level, cheat=cheat, sort_by=sort_by, sort_dir=sort_dir, admin=admin)
+    headers = ["Date", "Athlete", "Email", "Exercise", "Reps", "Form Score", "Level", "Grade", "Cheat", "Confidence", "Score"]
+    csv_rows = [
+        [
+            r.get("created_at", ""),
+            r.get("athlete_name", ""),
+            r.get("athlete_email", ""),
+            r.get("exercise_type", ""),
+            r.get("total_reps", 0),
+            r.get("avg_correctness_score", 0),
+            r.get("fitness_level", ""),
+            r.get("form_grade", ""),
+            "Yes" if r.get("cheat_detected") else "No",
+            r.get("confidence_score", 0),
+            r.get("hybrid_form_score", r.get("avg_correctness_score", 0)),
+        ]
+        for r in docs
+    ]
+    if format.lower() == "pdf":
+        sections = [
+            ("Results Summary", [f"Total records: {len(docs)}"]),
+            ("Records", [
+                f"{r.get('created_at','')} | {r.get('athlete_name','')} | {r.get('exercise_type','')} | reps {r.get('total_reps',0)} | score {r.get('avg_correctness_score',0)} | cheat {'yes' if r.get('cheat_detected') else 'no'}"
+                for r in docs
+            ]),
+        ]
+        return _pdf_download("admin_results.pdf", "AthleteAI Admin Results Export", sections)
+    return _csv_download("admin_results.csv", headers, csv_rows)
 
 
 @app.get("/api/admin/ai-metrics")
@@ -898,6 +1382,43 @@ class CreateTestRequest(BaseModel):
     duration_minutes: int
     description: Optional[str] = None
     max_participants: Optional[int] = None
+    assigned_roster: Optional[str] = None
+    target_emails: Optional[list[str]] = None
+    template_id: Optional[str] = None
+
+
+class UpdateTestRequest(BaseModel):
+    name: Optional[str] = None
+    sport: Optional[str] = None
+    exercises: Optional[list] = None
+    scheduled_date: Optional[str] = None
+    start_time: Optional[str] = None
+    duration_minutes: Optional[int] = None
+    description: Optional[str] = None
+    max_participants: Optional[int] = None
+    assigned_roster: Optional[str] = None
+    target_emails: Optional[list[str]] = None
+
+
+class TestTemplateRequest(BaseModel):
+    name: str
+    sport: str
+    exercises: list
+    duration_minutes: Optional[int] = 60
+    description: Optional[str] = None
+    max_participants: Optional[int] = None
+    assigned_roster: Optional[str] = None
+    target_emails: Optional[list[str]] = None
+
+
+async def resolve_target_users(target_emails: Optional[list[str]]) -> list[str]:
+    if not target_emails:
+        return []
+    cleaned = [email.strip().lower() for email in target_emails if email and email.strip()]
+    if not cleaned:
+        return []
+    users = await db.users.find({"email": {"$in": cleaned}}, {"_id": 1}).to_list(500)
+    return [str(u["_id"]) for u in users]
 
 
 def require_authority(user=Depends(get_current_user)):
@@ -909,16 +1430,31 @@ def require_authority(user=Depends(get_current_user)):
 @app.post("/api/tests")
 async def create_test(req: CreateTestRequest, user=Depends(require_authority)):
     creator = await db.users.find_one({"_id": user["user_id"]}, {"name": 1})
+    template_doc = None
+    if req.template_id:
+        template_doc = await db.test_templates.find_one({"_id": req.template_id})
+        if not template_doc:
+            raise HTTPException(404, "Template not found")
+    target_user_ids = await resolve_target_users(req.target_emails)
+    template_payload = template_doc or {}
     tid = str(uuid.uuid4())
     await db.tests.insert_one({
-        "_id": tid, "name": req.name, "sport": req.sport,
-        "exercises": req.exercises,
-        "scheduled_date": req.scheduled_date, "start_time": req.start_time,
-        "duration_minutes": req.duration_minutes,
-        "description": req.description, "max_participants": req.max_participants,
+        "_id": tid,
+        "name": req.name or template_payload.get("name", "Untitled Test"),
+        "sport": req.sport or template_payload.get("sport", "General"),
+        "exercises": req.exercises or template_payload.get("exercises", []),
+        "scheduled_date": req.scheduled_date,
+        "start_time": req.start_time,
+        "duration_minutes": req.duration_minutes or template_payload.get("duration_minutes", 60),
+        "description": req.description if req.description is not None else template_payload.get("description"),
+        "max_participants": req.max_participants if req.max_participants is not None else template_payload.get("max_participants"),
+        "assigned_roster": req.assigned_roster if req.assigned_roster is not None else template_payload.get("assigned_roster"),
+        "target_emails": req.target_emails if req.target_emails is not None else template_payload.get("target_emails", []),
+        "target_user_ids": target_user_ids if target_user_ids else template_payload.get("target_user_ids", []),
         "created_by": user["user_id"],
         "created_by_name": creator.get("name", "") if creator else "",
         "status": "upcoming",
+        "is_archived": False,
         "created_at": datetime.utcnow(),
     })
     return {"test_id": tid, "status": "upcoming"}
@@ -963,25 +1499,63 @@ def compute_test_status(test: dict) -> str:
 
 
 @app.get("/api/tests")
-async def list_tests(status: Optional[str] = None, user=Depends(get_current_user)):
-    filt = {}
-    # Note: we don't filter by status in the query anymore since we compute it dynamically
-    docs = await db.tests.find(filt).sort("scheduled_date", 1).to_list(200)
+async def list_tests(
+    status: Optional[str] = None,
+    q: Optional[str] = None,
+    sort_by: Optional[str] = None,
+    sort_dir: str = "asc",
+    include_archived: bool = False,
+    user=Depends(get_current_user),
+):
+    docs = await db.tests.find({}).to_list(200)
+    search = q.strip().lower() if q else ""
     result = []
     for doc in docs:
         s = serialize(doc)
-        # Compute real-time status
         computed_status = compute_test_status(doc)
         s["status"] = computed_status
-
-        # Filter by status if requested (after computing)
-        if status and computed_status != status:
-            continue
-
+        s["is_archived"] = bool(doc.get("is_archived", False))
         reg = await db.test_registrations.find_one({"test_id": str(doc["_id"]), "user_id": user["user_id"]})
         s["is_registered"] = reg is not None
         s["participant_count"] = await db.test_registrations.count_documents({"test_id": str(doc["_id"])})
+        s["target_count"] = len(doc.get("target_user_ids", [])) if isinstance(doc.get("target_user_ids"), list) else 0
+
+        if s["is_archived"] and not include_archived:
+            continue
+        if user.get("role") == "athlete":
+            target_users = doc.get("target_user_ids") or []
+            if target_users and user.get("user_id") not in target_users:
+                continue
+
+        if status and computed_status != status:
+            continue
+        if search:
+            haystack = " ".join([
+                str(s.get("name", "")),
+                str(s.get("sport", "")),
+                str(s.get("description", "")),
+                str(s.get("created_by_name", "")),
+                " ".join(str(e.get("type", e)).lower() if isinstance(e, dict) else str(e).lower() for e in (s.get("exercises") or [])),
+            ]).lower()
+            if search not in haystack:
+                continue
         result.append(s)
+
+    reverse = sort_dir.lower() != "asc"
+
+    def test_sort_key(item: dict):
+        key = sort_by or "scheduled_date"
+        value = item.get(key)
+        if key in {"participant_count", "duration_minutes"}:
+            return int(value or 0)
+        if key == "name":
+            return str(value or "").lower()
+        if key == "status":
+            order = {"upcoming": 0, "active": 1, "completed": 2}
+            return order.get(str(value or ""), 9)
+        return str(value or "")
+
+    result.sort(key=test_sort_key, reverse=reverse)
     return result
 
 
@@ -989,12 +1563,19 @@ async def list_tests(status: Optional[str] = None, user=Depends(get_current_user
 async def get_test(test_id: str, user=Depends(get_current_user)):
     doc = await db.tests.find_one({"_id": test_id})
     if not doc: raise HTTPException(404, "Test not found")
+    if doc.get("is_archived") and user.get("role") == "athlete":
+        raise HTTPException(404, "Test not found")
+    target_users = doc.get("target_user_ids") or []
+    if user.get("role") == "athlete" and target_users and user["user_id"] not in target_users:
+        raise HTTPException(404, "Test not found")
     s = serialize(doc)
     # Compute real-time status
     s["status"] = compute_test_status(doc)
+    s["is_archived"] = bool(doc.get("is_archived", False))
     reg = await db.test_registrations.find_one({"test_id": test_id, "user_id": user["user_id"]})
     s["is_registered"] = reg is not None
     s["participant_count"] = await db.test_registrations.count_documents({"test_id": test_id})
+    s["target_count"] = len(doc.get("target_user_ids", [])) if isinstance(doc.get("target_user_ids"), list) else 0
     return s
 
 
@@ -1005,6 +1586,43 @@ async def update_test_status(test_id: str, status: str, user=Depends(require_aut
     res = await db.tests.update_one({"_id": test_id}, {"$set": {"status": status}})
     if res.matched_count == 0: raise HTTPException(404, "Test not found")
     return {"success": True}
+
+
+@app.patch("/api/tests/{test_id}")
+async def update_test(test_id: str, req: UpdateTestRequest, user=Depends(require_authority)):
+    doc = await db.tests.find_one({"_id": test_id})
+    if not doc:
+        raise HTTPException(404, "Test not found")
+    updates = {k: v for k, v in req.dict().items() if v is not None}
+    if not updates:
+        raise HTTPException(400, "No fields to update")
+    if "target_emails" in updates:
+        updates["target_user_ids"] = await resolve_target_users(updates.pop("target_emails"))
+    await db.tests.update_one({"_id": test_id}, {"$set": updates})
+    return {"success": True}
+
+
+@app.patch("/api/tests/{test_id}/archive")
+async def archive_test(test_id: str, archived: bool = True, user=Depends(require_authority)):
+    doc = await db.tests.find_one({"_id": test_id})
+    if not doc:
+        raise HTTPException(404, "Test not found")
+    updates = {"is_archived": archived}
+    if archived:
+        updates.update({"status": "completed", "archived_at": datetime.utcnow(), "archived_by": user["user_id"]})
+    else:
+        updates.update({"archived_at": None, "archived_by": None})
+    await db.tests.update_one({"_id": test_id}, {"$set": updates})
+    return {"success": True, "is_archived": archived}
+
+
+@app.delete("/api/tests/{test_id}")
+async def soft_delete_test(test_id: str, user=Depends(require_authority)):
+    doc = await db.tests.find_one({"_id": test_id})
+    if not doc:
+        raise HTTPException(404, "Test not found")
+    await db.tests.update_one({"_id": test_id}, {"$set": {"is_archived": True, "status": "completed", "deleted_at": datetime.utcnow(), "deleted_by": user["user_id"]}})
+    return {"success": True, "is_archived": True}
 
 
 @app.post("/api/tests/{test_id}/register")
@@ -1048,6 +1666,57 @@ async def test_participants(test_id: str, user=Depends(require_authority)):
              "email": umap.get(r["user_id"], {}).get("email", "")} for r in regs]
 
 
+@app.get("/api/test-templates")
+async def list_test_templates(user=Depends(require_authority)):
+    filt = {} if user.get("role") == "admin" else {"created_by": user["user_id"]}
+    docs = await db.test_templates.find(filt).sort("created_at", -1).to_list(100)
+    return [serialize(d) for d in docs]
+
+
+@app.post("/api/test-templates")
+async def create_test_template(req: TestTemplateRequest, user=Depends(require_authority)):
+    tid = str(uuid.uuid4())
+    target_user_ids = await resolve_target_users(req.target_emails)
+    await db.test_templates.insert_one({
+        "_id": tid,
+        "name": req.name,
+        "sport": req.sport,
+        "exercises": req.exercises,
+        "duration_minutes": req.duration_minutes or 60,
+        "description": req.description,
+        "max_participants": req.max_participants,
+        "assigned_roster": req.assigned_roster,
+        "target_emails": req.target_emails or [],
+        "target_user_ids": target_user_ids,
+        "created_by": user["user_id"],
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow(),
+    })
+    return {"template_id": tid, "success": True}
+
+
+@app.post("/api/test-templates/{template_id}/clone")
+async def clone_test_template(template_id: str, overrides: Optional[CreateTestRequest] = None, user=Depends(require_authority)):
+    template = await db.test_templates.find_one({"_id": template_id})
+    if not template:
+        raise HTTPException(404, "Template not found")
+    req = overrides or CreateTestRequest(
+        name=template.get("name", "Untitled Test"),
+        sport=template.get("sport", "General"),
+        exercises=template.get("exercises", []),
+        scheduled_date=datetime.utcnow().date().isoformat(),
+        start_time="09:00",
+        duration_minutes=int(template.get("duration_minutes", 60) or 60),
+        description=template.get("description"),
+        max_participants=template.get("max_participants"),
+        assigned_roster=template.get("assigned_roster"),
+        target_emails=template.get("target_emails", []),
+        template_id=template_id,
+    )
+    created = await create_test(req, user=user)
+    return created
+
+
 @app.get("/api/tests/{test_id}/leaderboard")
 async def test_leaderboard(test_id: str, user=Depends(get_current_user)):
     test = await db.tests.find_one({"_id": test_id})
@@ -1086,6 +1755,168 @@ async def test_leaderboard(test_id: str, user=Depends(get_current_user)):
     entries = sorted(best.values(), key=lambda x: x["score"], reverse=True)
     for i, e in enumerate(entries): e["rank"] = i + 1
     return entries
+
+
+@app.get("/api/tests/{test_id}/leaderboard/export")
+async def export_test_leaderboard(test_id: str, format: str = "csv", user=Depends(get_current_user)):
+    entries = await test_leaderboard(test_id, user=user)
+    headers = ["Rank", "Athlete", "Email", "Score", "Grade", "Reps", "Form Score", "Level", "Cheat"]
+    csv_rows = [
+        [
+            e.get("rank", 0),
+            e.get("name", ""),
+            e.get("email", ""),
+            e.get("score", 0),
+            e.get("form_grade", ""),
+            e.get("total_reps", 0),
+            e.get("avg_correctness_score", 0),
+            e.get("fitness_level", ""),
+            "Yes" if e.get("cheat_detected") else "No",
+        ]
+        for e in entries
+    ]
+    if format.lower() == "pdf":
+        sections = [
+            ("Leaderboard Summary", [f"Entries: {len(entries)}"]),
+            ("Rankings", [
+                f"#{e.get('rank', 0)} | {e.get('name', '')} | score {e.get('score', 0)} | grade {e.get('form_grade', '')} | reps {e.get('total_reps', 0)} | cheat {'yes' if e.get('cheat_detected') else 'no'}"
+                for e in entries
+            ]),
+        ]
+        return _pdf_download(f"leaderboard_{test_id}.pdf", "AthleteAI Leaderboard Export", sections)
+    return _csv_download(f"leaderboard_{test_id}.csv", headers, csv_rows)
+
+
+@app.get("/api/tests/{test_id}/analytics")
+async def test_analytics(test_id: str, user=Depends(require_authority)):
+    """Analytics for a specific test: participation, completion, performance."""
+    test = await db.tests.find_one({"_id": test_id})
+    if not test:
+        raise HTTPException(404, "Test not found")
+    
+    registrations = await db.test_registrations.find({"test_id": test_id}).to_list(500)
+    total_registered = len(registrations)
+    
+    sessions = await db.test_sessions.find({"test_id": test_id, "status": "completed"}).to_list(500)
+    total_completed = len(sessions)
+    completion_rate = (total_completed / total_registered * 100) if total_registered > 0 else 0
+    
+    sid_list = [str(s["_id"]) for s in sessions]
+    results = await db.analysis_results.find({"session_id": {"$in": sid_list}}).to_list(500)
+    
+    scores = [r.get("avg_correctness_score", 0) for r in results]
+    avg_score = sum(scores) / len(scores) if scores else 0
+    
+    cheat_count = sum(1 for r in results if r.get("cheat_detected", False))
+    
+    exercises = test.get("exercises", [])
+    ex_performance = {}
+    for ex in exercises:
+        ex_type = ex.get("type") if isinstance(ex, dict) else ex
+        ex_results = [r for r in results if r.get("exercise_type") == ex_type]
+        ex_performance[ex_type] = {
+            "count": len(ex_results),
+            "avg_score": sum(r.get("avg_correctness_score", 0) for r in ex_results) / len(ex_results) if ex_results else 0,
+            "avg_reps": sum(r.get("total_reps", 0) for r in ex_results) / len(ex_results) if ex_results else 0,
+            "cheat_detected_count": sum(1 for r in ex_results if r.get("cheat_detected", False)),
+        }
+    
+    top_performers = sorted(
+        [
+            {
+                "user_id": r.get("user_id"),
+                "score": r.get("avg_correctness_score", 0),
+                "exercise": r.get("exercise_type"),
+            }
+            for r in results
+        ],
+        key=lambda x: x["score"],
+        reverse=True,
+    )[:3]
+    
+    return {
+        "test_id": test_id,
+        "test_name": test.get("name"),
+        "total_registered": total_registered,
+        "total_completed": total_completed,
+        "completion_rate": round(completion_rate, 1),
+        "avg_score": round(avg_score, 1),
+        "cheat_flags": cheat_count,
+        "exercise_performance": ex_performance,
+        "top_performers": top_performers,
+    }
+
+
+@app.get("/api/cohort-analytics")
+async def cohort_analytics(user=Depends(require_authority)):
+    """Aggregate performance by roster/cohort."""
+    if user.get("role") != "admin":
+        raise HTTPException(403, "Admin only")
+    
+    tests = await db.tests.find({"assigned_roster": {"$exists": True, "$ne": None}}).to_list(500)
+    cohorts = {}
+    
+    for test in tests:
+        roster = test.get("assigned_roster")
+        if roster not in cohorts:
+            cohorts[roster] = {
+                "roster": roster,
+                "tests": 0,
+                "total_participants": 0,
+                "avg_completion_rate": 0,
+                "avg_score": 0,
+            }
+        
+        registrations = await db.test_registrations.find({"test_id": str(test["_id"])}).to_list(500)
+        sessions = await db.test_sessions.find({"test_id": str(test["_id"]), "status": "completed"}).to_list(500)
+        
+        cohorts[roster]["tests"] += 1
+        cohorts[roster]["total_participants"] += len(registrations)
+        
+        if registrations:
+            completion_rate = (len(sessions) / len(registrations)) * 100
+        else:
+            completion_rate = 0
+        
+        sid_list = [str(s["_id"]) for s in sessions]
+        results = await db.analysis_results.find({"session_id": {"$in": sid_list}}).to_list(500)
+        
+        scores = [r.get("avg_correctness_score", 0) for r in results]
+        avg_score = sum(scores) / len(scores) if scores else 0
+        
+        cohorts[roster]["avg_completion_rate"] = (cohorts[roster]["avg_completion_rate"] + completion_rate) / 2
+        cohorts[roster]["avg_score"] = (cohorts[roster]["avg_score"] + avg_score) / 2
+    
+    return {"cohorts": list(cohorts.values())}
+
+
+@app.get("/api/results/{result_id}/exercise-metrics")
+async def result_exercise_metrics(result_id: str, user=Depends(get_current_user)):
+    """Detailed metrics for a single result."""
+    result = await db.analysis_results.find_one({"_id": result_id})
+    if not result:
+        raise HTTPException(404, "Result not found")
+    
+    if user.get("role") == "athlete" and result.get("user_id") != user["user_id"]:
+        raise HTTPException(403, "Cannot view other athlete's results")
+    
+    return {
+        "exercise_type": result.get("exercise_type"),
+        "total_reps": result.get("total_reps", 0),
+        "avg_correctness_score": result.get("avg_correctness_score", 0),
+        "form_grade": result.get("form_grade", "N/A"),
+        "fitness_level": result.get("fitness_level", "Unknown"),
+        "jump_height_cm": result.get("jump_height_cm"),
+        "duration_seconds": result.get("duration_seconds", 0),
+        "reps_per_minute": result.get("reps_per_minute", 0),
+        "cheat_detected": result.get("cheat_detected", False),
+        "rule_score": result.get("rule_score", 0),
+        "ml_score": result.get("ml_score", 0),
+        "hybrid_form_score": result.get("hybrid_form_score", 0),
+        "confidence_score": result.get("confidence_score", 0),
+        "estimated_percentile": result.get("estimated_percentile", 0),
+        "created_at": result.get("created_at").isoformat() if isinstance(result.get("created_at"), datetime) else "",
+    }
 
 
 # ── Health ─────────────────────────────────────────────────────────────────────

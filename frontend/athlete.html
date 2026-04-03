@@ -46,6 +46,24 @@
         <div class="card stat-card"><div class="stat-icon">📈</div><div class="stat-val" id="st-tests">—</div><div class="stat-label">Tests Done</div></div>
         <div class="card stat-card"><div class="stat-icon">🎯</div><div class="stat-val" id="st-level">—</div><div class="stat-label">My Level</div></div>
       </div>
+      <div class="dashboard-charts" style="margin-bottom:1.25rem">
+        <div class="card chart-card">
+          <div class="section-header"><span class="section-title">Progress Tracker</span><span style="font-size:.75rem;color:var(--muted)" id="progress-summary-note">Loading...</span></div>
+          <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.75rem;margin-bottom:1rem">
+            <div class="mini-stat"><div class="mini-stat-val" id="pg-total-tests">—</div><div class="mini-stat-label">Total Tests</div></div>
+            <div class="mini-stat"><div class="mini-stat-val" id="pg-best-score">—</div><div class="mini-stat-label">Best Score</div></div>
+            <div class="mini-stat"><div class="mini-stat-val" id="pg-score-delta">—</div><div class="mini-stat-label">Trend</div></div>
+            <div class="mini-stat"><div class="mini-stat-val" id="pg-goal-progress">—</div><div class="mini-stat-label">Goal Progress</div></div>
+          </div>
+          <div style="font-size:.8rem;color:var(--muted);margin-bottom:.75rem" id="progress-goal-text">No goals set yet.</div>
+          <div class="prog-bar" style="height:8px"><div class="prog-fill" id="goal-progress-fill" style="width:0%"></div></div>
+          <div id="progress-badges" style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.9rem"></div>
+        </div>
+        <div class="card chart-card">
+          <div class="section-header"><span class="section-title">Notifications</span><span style="font-size:.75rem;color:var(--muted)" id="notification-count">0</span></div>
+          <div id="notification-list" style="display:flex;flex-direction:column;gap:.65rem;max-height:230px;overflow:auto"></div>
+        </div>
+      </div>
       <div class="dashboard-charts">
         <div class="card chart-card"><div class="section-header"><span class="section-title">Form Score Trend</span><span style="font-size:.75rem;color:var(--muted)">Last 10 tests</span></div><canvas id="trend-chart" class="dashboard-chart"></canvas></div>
         <div class="card chart-card"><div class="section-header"><span class="section-title">Exercise Mix</span></div><canvas id="dist-chart" class="dashboard-chart"></canvas></div>
@@ -155,6 +173,17 @@
               </div>
               <button class="btn btn-ghost btn-sm" onclick="clearUploadedVideo()" style="color:var(--red)">✕ Clear</button>
             </div>
+            <div id="selected-preview-card" class="hidden" style="margin-top:1rem;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem">
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;margin-bottom:.75rem">
+                <div class="section-title">Selected Video Preview</div>
+                <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+                  <button class="btn btn-ghost btn-sm" onclick="clearSelectedVideo()">Clear</button>
+                  <button class="btn btn-ghost btn-sm" onclick="document.getElementById('upload-input').click()">Choose File</button>
+                </div>
+              </div>
+              <video id="selected-preview-video" controls playsinline preload="metadata" style="width:100%;border-radius:8px;background:#000;aspect-ratio:16/9"></video>
+              <div id="selected-preview-meta" style="margin-top:.75rem;font-size:.8rem;color:var(--muted)"></div>
+            </div>
           </div>
           <button class="btn btn-primary" style="width:100%;padding:1rem;font-size:1rem" id="submit-btn" onclick="submitVideo()" disabled>🚀 Analyze Video</button>
         </div>
@@ -186,6 +215,8 @@
         <select id="f-exercise" onchange="loadHistory()"><option value="">All Exercises</option><option value="pushup">Push-ups</option><option value="squat">Squats</option><option value="vertical_jump">Vertical Jump</option><option value="jumping_jack">Jumping Jacks</option><option value="situp">Sit-ups</option></select>
         <select id="f-level" onchange="loadHistory()"><option value="">All Levels</option><option>Advanced</option><option>Intermediate</option><option>Beginner</option></select>
         <button class="btn btn-ghost btn-sm" onclick="loadHistory()">🔄 Refresh</button>
+        <button class="btn btn-ghost btn-sm" onclick="downloadHistoryExport('csv')">⬇ CSV</button>
+        <button class="btn btn-ghost btn-sm" onclick="downloadHistoryExport('pdf')">📄 PDF</button>
       </div>
       <div class="card">
         <table class="tbl">
@@ -220,6 +251,8 @@
           <option value="">— Select an Assessment —</option>
         </select>
         <button class="btn btn-ghost btn-sm" onclick="loadLeaderboard()">🔄 Refresh</button>
+        <button class="btn btn-ghost btn-sm" onclick="downloadLeaderboardExport('csv')">⬇ CSV</button>
+        <button class="btn btn-ghost btn-sm" onclick="downloadLeaderboardExport('pdf')">📄 PDF</button>
       </div>
       <div id="leaderboard-body"><div style="text-align:center;padding:3rem;color:var(--muted)">Select an assessment above to view rankings.</div></div>
     </section>
@@ -248,6 +281,9 @@
             <div class="form-group"><label>Age</label><input type="number" id="p-age"></div>
             <div class="form-group"><label>Height (cm)</label><input type="number" id="p-height"></div>
             <div class="form-group"><label>Weight (kg)</label><input type="number" id="p-weight"></div>
+            <div class="form-group"><label>Goal Avg Score</label><input type="number" id="p-goal-score" min="0" max="100" step="0.1" placeholder="80"></div>
+            <div class="form-group"><label>Goal Tests / Week</label><input type="number" id="p-goal-tests" min="0" step="1" placeholder="3"></div>
+            <div class="form-group" style="grid-column:1 / -1"><label>Primary Exercise Goal</label><input type="text" id="p-goal-exercise" placeholder="pushup"></div>
           </div>
           <button class="btn btn-primary" onclick="saveProfile()">Save Changes</button>
         </div>
@@ -288,6 +324,8 @@ const API = 'http://localhost:8000/api';
 const token = localStorage.getItem('token');
 const user  = JSON.parse(localStorage.getItem('user') || 'null');
 let selectedEx = 'pushup', selectedFile = null, charts = {};
+let selectedFileUrl = null;
+let selectedFileSource = 'upload';
 const POSE_MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task';
 
 const KP = {
@@ -333,6 +371,50 @@ function logout() {
   window.location.href = 'login.html';
 }
 
+async function downloadExport(path, filename) {
+  try {
+    const res = await fetch(`${API}${path}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.status === 401) { logout(); return; }
+    if (!res.ok) {
+      const text = await res.text().catch(() => 'Export failed');
+      throw new Error(text || `Export failed (${res.status})`);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    toast('Export downloaded', 'ok');
+  } catch (e) {
+    toast(e.message || 'Export failed', 'err');
+  }
+}
+
+async function downloadLeaderboardExport(format) {
+  const testId = document.getElementById('lb-test-select')?.value;
+  if (!testId) {
+    toast('Select an assessment first', 'err');
+    return;
+  }
+  await downloadExport(`/tests/${testId}/leaderboard/export?format=${encodeURIComponent(format)}`, `leaderboard_${testId}.${format}`);
+}
+
+async function downloadHistoryExport(format) {
+  const params = new URLSearchParams();
+  const exercise = document.getElementById('f-exercise')?.value;
+  const level = document.getElementById('f-level')?.value;
+  if (exercise) params.set('exercise_type', exercise);
+  if (level) params.set('fitness_level', level);
+  params.set('format', format);
+  await downloadExport(`/results/export?${params.toString()}`, `athlete_results.${format}`);
+}
+
 async function api(method, path, body=null, isForm=false) {
   const h = { Authorization: `Bearer ${token}` };
   if (body && !isForm) h['Content-Type'] = 'application/json';
@@ -350,6 +432,8 @@ async function api(method, path, body=null, isForm=false) {
 // ── Demo data ──────────────────────────────────────────────────────────────
 function demoFallback(method, path, body) {
   if (path==='/results') return mkResults();
+  if (path==='/progress') return mkProgress();
+  if (path==='/notifications') return mkNotifications();
   if (path.includes('/sessions/upload')) return {session_id:'s1',job_id:'j1'};
   if (path.includes('/jobs/')) return {status:'completed',progress:100};
   if (path.includes('/result')) return mkDetail();
@@ -422,6 +506,34 @@ function mkDetail() {
       benchmarks:{beginner:10,intermediate:25,advanced:40},metric_value:28,metric_unit:'reps'}};
 }
 
+function mkProgress() {
+  return {
+    summary: { total_tests: 8, average_score: 78.4, best_score: 92.1, best_reps: 38, score_delta: 4.3, recent_average: 80.2 },
+    goals: { goal_avg_score: 85, goal_tests_per_week: 3, goal_primary_exercise: 'pushup' },
+    goal_progress: 92.2,
+    bests: [
+      { exercise_type: 'pushup', score: 92.1, reps: 38, date: new Date().toISOString() },
+      { exercise_type: 'squat', score: 86.2, reps: 31, date: new Date().toISOString() },
+    ],
+    trend: [],
+    badges: [
+      { id: 'starter', title: 'Getting Started', description: 'Completed 5 or more tests.' },
+      { id: 'form_focus', title: 'Form Focus', description: 'Average form score reached 75% or higher.' },
+    ],
+  };
+}
+
+function mkNotifications() {
+  return {
+    count: 3,
+    items: [
+      { type: 'result_ready', title: 'Latest result ready', message: 'Your pushup result is available.', timestamp: new Date().toISOString() },
+      { type: 'reminder', title: 'Assessment soon: Football Fitness Test', message: 'Starts in 6 hours.', timestamp: new Date().toISOString() },
+      { type: 'milestone', title: 'Badge unlocked: Form Focus', message: 'Average form score reached 75% or higher.', timestamp: new Date().toISOString() },
+    ],
+  };
+}
+
 // ── Navigation ─────────────────────────────────────────────────────────────
 function showSec(s) {
   document.querySelectorAll('[id^="sec-"]').forEach(el=>el.classList.add('hidden'));
@@ -439,15 +551,74 @@ function showSec(s) {
 async function loadDashboard() {
   try {
     const res = await api('GET','/results');
-    if (!res?.length) return;
-    document.getElementById('st-reps').textContent  = Math.max(...res.map(r=>r.total_reps));
-    document.getElementById('st-score').textContent = (res.reduce((s,r)=>s+r.avg_correctness_score,0)/res.length).toFixed(0)+'%';
-    document.getElementById('st-tests').textContent = res.length;
-    document.getElementById('st-level').textContent = res[0]?.fitness_level||'—';
-    renderRecent(res.slice(0,5));
-    renderTrend(res.slice(0,10).reverse());
-    renderDist(res);
+    const progress = await api('GET','/progress');
+    const notifications = await api('GET','/notifications');
+    if (res?.length) {
+      document.getElementById('st-reps').textContent  = Math.max(...res.map(r=>r.total_reps));
+      document.getElementById('st-score').textContent = (res.reduce((s,r)=>s+r.avg_correctness_score,0)/res.length).toFixed(0)+'%';
+      document.getElementById('st-tests').textContent = res.length;
+      document.getElementById('st-level').textContent = res[0]?.fitness_level||'—';
+      renderRecent(res.slice(0,5));
+      renderTrend(res.slice(0,10).reverse());
+      renderDist(res);
+    }
+    renderProgress(progress);
+    renderNotifications(notifications);
   } catch(e){console.error(e);}
+}
+
+function renderProgress(progress) {
+  if (!progress) return;
+  const summary = progress.summary || {};
+  document.getElementById('pg-total-tests').textContent = summary.total_tests ?? '—';
+  document.getElementById('pg-best-score').textContent = `${(summary.best_score ?? 0).toFixed(0)}%`;
+  const delta = Number(summary.score_delta ?? 0);
+  document.getElementById('pg-score-delta').textContent = `${delta >= 0 ? '+' : ''}${delta.toFixed(1)}%`;
+
+  const goalProgress = progress.goal_progress;
+  document.getElementById('pg-goal-progress').textContent = goalProgress == null ? '—' : `${goalProgress.toFixed(0)}%`;
+  const fill = document.getElementById('goal-progress-fill');
+  if (fill) fill.style.width = `${Math.max(0, Math.min(100, goalProgress ?? 0))}%`;
+
+  const goals = progress.goals || {};
+  const goalText = document.getElementById('progress-goal-text');
+  if (goalText) {
+    if (goals.goal_avg_score || goals.goal_tests_per_week || goals.goal_primary_exercise) {
+      goalText.textContent = `Target: ${goals.goal_avg_score ? `${goals.goal_avg_score}% avg score` : 'no score target'} · ${goals.goal_tests_per_week ? `${goals.goal_tests_per_week}/week` : 'no weekly target'} · ${goals.goal_primary_exercise || 'any exercise'}`;
+    } else {
+      goalText.textContent = 'No goals set yet.';
+    }
+  }
+
+  const badges = Array.isArray(progress.badges) ? progress.badges : [];
+  const badgeWrap = document.getElementById('progress-badges');
+  if (badgeWrap) {
+    badgeWrap.innerHTML = badges.length
+      ? badges.map(b => `<span class="badge badge-cyan" title="${b.description}">${b.title}</span>`).join('')
+      : '<span class="badge badge-amber">No badges yet</span>';
+  }
+}
+
+function renderNotifications(payload) {
+  const items = payload?.items || [];
+  const countEl = document.getElementById('notification-count');
+  if (countEl) countEl.textContent = String(items.length);
+  const list = document.getElementById('notification-list');
+  if (!list) return;
+  if (!items.length) {
+    list.innerHTML = '<div style="color:var(--muted);font-size:.8rem">No notifications right now.</div>';
+    return;
+  }
+  list.innerHTML = items.map(item => {
+    const tone = item.type === 'reminder' ? 'badge-amber' : item.type === 'milestone' ? 'badge-green' : 'badge-cyan';
+    return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.75rem .8rem">
+      <div style="display:flex;justify-content:space-between;gap:.75rem;align-items:flex-start;margin-bottom:.25rem">
+        <div style="font-weight:600;font-size:.9rem">${item.title || 'Update'}</div>
+        <span class="badge ${tone}" style="font-size:.58rem">${String(item.type || 'info').replaceAll('_',' ')}</span>
+      </div>
+      <div style="font-size:.78rem;color:var(--muted)">${item.message || ''}</div>
+    </div>`;
+  }).join('');
 }
 
 function renderRecent(res) {
@@ -485,6 +656,63 @@ function selectEx(el) {
   document.querySelectorAll('.ex-btn').forEach(b=>b.classList.remove('selected'));
   el.classList.add('selected'); selectedEx = el.dataset.ex;
   resetLiveStats();
+}
+
+function setSelectedVideo(file, source = 'upload') {
+  if (!file) return;
+  selectedFile = file;
+  selectedFileSource = source;
+  if (selectedFileUrl) {
+    URL.revokeObjectURL(selectedFileUrl);
+    selectedFileUrl = null;
+  }
+  selectedFileUrl = URL.createObjectURL(file);
+
+  const previewCard = document.getElementById('selected-preview-card');
+  const previewVideo = document.getElementById('selected-preview-video');
+  const previewMeta = document.getElementById('selected-preview-meta');
+  if (previewVideo) {
+    previewVideo.src = selectedFileUrl;
+    previewVideo.load();
+  }
+  if (previewMeta) {
+    const label = source === 'camera' ? 'Recorded video' : 'Uploaded video';
+    previewMeta.textContent = `${label} • ${file.name} • ${(file.size / 1024 / 1024).toFixed(1)} MB`;
+  }
+  const cameraInfo = document.getElementById('camera-file-info');
+  const uploadInfo = document.getElementById('upload-file-info');
+  if (source === 'camera') {
+    cameraInfo?.classList.remove('hidden');
+    uploadInfo?.classList.add('hidden');
+  } else {
+    uploadInfo?.classList.remove('hidden');
+    cameraInfo?.classList.add('hidden');
+  }
+  previewCard?.classList.remove('hidden');
+  document.getElementById('submit-btn').disabled = false;
+}
+
+function clearSelectedVideo() {
+  selectedFile = null;
+  selectedFileSource = 'upload';
+  recordedChunks = [];
+  if (selectedFileUrl) {
+    URL.revokeObjectURL(selectedFileUrl);
+    selectedFileUrl = null;
+  }
+  ['camera-file-info', 'upload-file-info', 'selected-preview-card'].forEach(id => {
+    document.getElementById(id)?.classList.add('hidden');
+  });
+  const previewVideo = document.getElementById('selected-preview-video');
+  if (previewVideo) {
+    previewVideo.removeAttribute('src');
+    previewVideo.load();
+  }
+  const uploadInput = document.getElementById('upload-input');
+  if (uploadInput) uploadInput.value = '';
+  const uploadVideoInput = document.getElementById('upload-video-input');
+  if (uploadVideoInput) uploadVideoInput.value = '';
+  document.getElementById('submit-btn').disabled = true;
 }
 
 // ── Camera Recording ───────────────────────────────────────────────────────
@@ -823,15 +1051,9 @@ async function startRecording() {
   mediaRecorder.onstop = () => {
     const blob = new Blob(recordedChunks, { type: 'video/webm' });
     const file = new File([blob], `recording-${Date.now()}.webm`, { type: 'video/webm' });
-    selectedFile = file;
-    
+    setSelectedVideo(file, 'camera');
     document.getElementById('camera-file-info').classList.remove('hidden');
-<<<<<<< HEAD
     document.getElementById('camera-file-size').textContent = file.name + ' — ' + (blob.size/1024/1024).toFixed(1)+' MB';
-=======
-    document.getElementById('camera-file-size').textContent = (blob.size/1024/1024).toFixed(1)+' MB';
->>>>>>> a7ad4593b4e3f7812a5f7108abf98b958f96dde2
-    document.getElementById('submit-btn').disabled = false;
     toast(`Video recorded! Live AI: ${liveStats.validReps}/${liveStats.totalReps} valid reps`,'ok');
   };
   
@@ -870,18 +1092,7 @@ function stopRecording() {
 }
 
 function clearCameraFile() {
-  selectedFile = null;
-  recordedChunks = [];
-<<<<<<< HEAD
-  const input = document.getElementById('upload-input');
-  if (input) input.value = '';
-=======
->>>>>>> a7ad4593b4e3f7812a5f7108abf98b958f96dde2
-  document.getElementById('camera-file-info').classList.add('hidden');
-  document.getElementById('upload-file-info').classList.add('hidden');
-  const uploadInput = document.getElementById('upload-video-input');
-  if (uploadInput) uploadInput.value = '';
-  document.getElementById('submit-btn').disabled = true;
+  clearSelectedVideo();
 }
 
 function handleVideoUpload(event) {
@@ -895,25 +1106,19 @@ function handleVideoUpload(event) {
     return;
   }
 
-  selectedFile = file;
+  setSelectedVideo(file, 'upload');
   const mb = (file.size / 1024 / 1024).toFixed(1);
   const meta = `${file.name} • ${mb} MB`;
   document.getElementById('upload-file-info').classList.remove('hidden');
   document.getElementById('upload-file-meta').textContent = meta;
   document.getElementById('camera-file-info').classList.add('hidden');
-  document.getElementById('submit-btn').disabled = false;
   toast('Video file selected. Ready for analysis.','ok');
 }
 
 function clearUploadedVideo() {
-  selectedFile = null;
-  const uploadInput = document.getElementById('upload-video-input');
-  if (uploadInput) uploadInput.value = '';
-  document.getElementById('upload-file-info').classList.add('hidden');
-  document.getElementById('submit-btn').disabled = true;
+  clearSelectedVideo();
 }
 
-<<<<<<< HEAD
 function handleFileUpload(inputEl) {
   const file = inputEl.files && inputEl.files[0];
   if (!file) return;
@@ -930,17 +1135,14 @@ function handleFileUpload(inputEl) {
     return;
   }
 
-  selectedFile = file;
+  setSelectedVideo(file, 'upload');
   recordedChunks = [];
   const info = document.getElementById('camera-file-info');
   const sizeEl = document.getElementById('camera-file-size');
   if (info) info.classList.remove('hidden');
   if (sizeEl) sizeEl.textContent = `${file.name} — ${(file.size/1024/1024).toFixed(1)} MB`;
-  document.getElementById('submit-btn').disabled = false;
 }
 
-=======
->>>>>>> a7ad4593b4e3f7812a5f7108abf98b958f96dde2
 async function submitVideo() {
   if (!selectedFile) return;
   const ol=document.getElementById('proc-overlay'); ol.classList.remove('hidden');
@@ -1174,7 +1376,7 @@ function phaseBadge(label,val){const score=(val??0);const color=score>=85?'badge
 // ── Profile ────────────────────────────────────────────────────────────────
 async function loadProfile() {
   try {
-    const u=await api('GET','/auth/me')||user;
+    const [u, progress] = await Promise.all([api('GET','/auth/me')||user, api('GET','/progress')]);
     const ini=u.name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
     document.getElementById('p-avatar').textContent=ini;
     document.getElementById('p-name-show').textContent=u.name;
@@ -1183,11 +1385,22 @@ async function loadProfile() {
     document.getElementById('p-age').value=u.age||'';
     document.getElementById('p-height').value=u.height_cm||'';
     document.getElementById('p-weight').value=u.weight_kg||'';
+    document.getElementById('p-goal-score').value = progress?.goals?.goal_avg_score ?? u.goal_avg_score ?? '';
+    document.getElementById('p-goal-tests').value = progress?.goals?.goal_tests_per_week ?? u.goal_tests_per_week ?? '';
+    document.getElementById('p-goal-exercise').value = progress?.goals?.goal_primary_exercise ?? u.goal_primary_exercise ?? '';
   }catch(e){console.error(e);}
 }
 async function saveProfile() {
   try {
-    await api('PUT','/profile',{name:document.getElementById('p-name').value||null,age:parseInt(document.getElementById('p-age').value)||null,height_cm:parseFloat(document.getElementById('p-height').value)||null,weight_kg:parseFloat(document.getElementById('p-weight').value)||null});
+    await api('PUT','/profile',{
+      name:document.getElementById('p-name').value||null,
+      age:parseInt(document.getElementById('p-age').value)||null,
+      height_cm:parseFloat(document.getElementById('p-height').value)||null,
+      weight_kg:parseFloat(document.getElementById('p-weight').value)||null,
+      goal_avg_score:parseFloat(document.getElementById('p-goal-score').value)||null,
+      goal_tests_per_week:parseInt(document.getElementById('p-goal-tests').value)||null,
+      goal_primary_exercise:document.getElementById('p-goal-exercise').value||null,
+    });
     toast('Profile updated!','ok');
   }catch(e){toast(e.message,'err');}
 }
