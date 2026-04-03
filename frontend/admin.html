@@ -38,6 +38,7 @@
     <button class="sidebar-item active authority-only" id="sn-create-test" onclick="showSec('create-test')">📋 Create Test</button>
     <button class="sidebar-item authority-only" id="sn-manage-tests" onclick="showSec('manage-tests')">🏆 Manage Tests</button>
     <button class="sidebar-item authority-only" id="sn-leaderboard-admin" onclick="showSec('leaderboard-admin')">🥇 Leaderboard</button>
+    <button class="sidebar-item authority-only" id="sn-analytics" onclick="showSec('analytics')">📈 Analytics</button>
   </aside>
 
   <main class="content">
@@ -111,6 +112,14 @@
       <div style="display:grid;grid-template-columns:1fr 320px;gap:1.5rem;max-width:960px">
         <div>
           <div class="card" style="margin-bottom:1rem">
+            <div class="section-title" style="margin-bottom:.875rem">Templates</div>
+            <div class="filter-row" style="margin-bottom:0">
+              <select id="ct-template-select" style="min-width:260px"><option value="">— Select a Template —</option></select>
+              <button class="btn btn-ghost btn-sm" onclick="loadTemplateIntoForm()">Load Template</button>
+              <button class="btn btn-ghost btn-sm" onclick="saveCurrentAsTemplate()">Save as Template</button>
+            </div>
+          </div>
+          <div class="card" style="margin-bottom:1rem">
             <div class="section-title" style="margin-bottom:1.25rem">Test Details</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:.875rem;margin-bottom:.875rem">
               <div><label style="font-family:'JetBrains Mono',monospace;font-size:.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:.35rem">Test Name *</label>
@@ -142,14 +151,27 @@
             </div>
           </div>
 
+          <div class="card" style="margin-bottom:1rem">
+            <div class="section-title" style="margin-bottom:.875rem">Targeting & Roster</div>
+            <div style="margin-bottom:.875rem"><label style="font-family:'JetBrains Mono',monospace;font-size:.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:.35rem">Target Athlete Emails (optional)</label>
+              <input type="text" id="ct-target-emails" placeholder="email1@example.com, email2@example.com" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.9rem;padding:.7rem 1rem" onfocus="this.style.borderColor='var(--purple)'" onblur="this.style.borderColor=''"></div>
+            <div><label style="font-family:'JetBrains Mono',monospace;font-size:.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:.35rem">Assigned Roster (optional)</label>
+              <input type="text" id="ct-roster" placeholder="e.g., Football Team, Cohort B" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.9rem;padding:.7rem 1rem" onfocus="this.style.borderColor='var(--purple)'" onblur="this.style.borderColor=''"></div>
+          </div>
+
           <div id="ct-error" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:.65rem 1rem;font-size:.82rem;color:var(--red);margin-bottom:.875rem;display:none"></div>
-          <button class="btn btn-admin" onclick="submitCreateTest()" id="ct-submit-btn" style="width:100%;padding:1rem;font-size:1rem">📋 Publish Assessment →</button>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+            <button class="btn btn-admin" onclick="submitCreateTest()" id="ct-submit-btn" style="width:100%;padding:1rem;font-size:1rem">📋 Publish Assessment →</button>
+            <button class="btn btn-ghost" onclick="resetTestEditor()" id="ct-reset-btn" style="width:100%;padding:1rem;font-size:1rem">↩ Reset</button>
+          </div>
         </div>
         <div>
           <div class="card" style="position:sticky;top:70px">
             <div class="section-title" style="margin-bottom:.875rem">📋 Guidelines</div>
             <div style="font-size:.8rem;color:var(--muted);line-height:1.7">
               <div style="margin-bottom:.75rem">✅ Select at least one exercise for the test.</div>
+              <div style="margin-bottom:.75rem">✅ Use templates to standardize repeat assessments.</div>
+              <div style="margin-bottom:.75rem">✅ Target athlete emails to limit the assessment to a cohort.</div>
               <div style="margin-bottom:.75rem">✅ Athletes get notified on their dashboard after you publish.</div>
               <div style="margin-bottom:.75rem">✅ Change status to <strong style="color:var(--green)">Active</strong> when the test starts.</div>
               <div>✅ After all submissions, set to <strong style="color:var(--purple)">Completed</strong> to lock the leaderboard.</div>
@@ -166,6 +188,10 @@
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem">
         <div class="filter-row" style="margin:0">
           <select id="mt-status-filter" onchange="loadManageTests()"><option value="">All</option><option value="upcoming">Upcoming</option><option value="active">Active</option><option value="completed">Completed</option></select>
+          <label style="display:flex;align-items:center;gap:.4rem;font-size:.8rem;color:var(--muted)"><input type="checkbox" id="mt-include-archived" onchange="loadManageTests()"> Show archived</label>
+          <input type="text" id="mt-search" placeholder="Search tests..." style="min-width:220px" onkeyup="loadManageTests()">
+          <select id="mt-sort" onchange="loadManageTests()"><option value="scheduled_date">Sort: Date</option><option value="name">Name</option><option value="status">Status</option><option value="participant_count">Participants</option></select>
+          <select id="mt-sort-dir" onchange="loadManageTests()"><option value="asc">Asc</option><option value="desc">Desc</option></select>
           <button class="btn btn-ghost btn-sm" onclick="loadManageTests()">🔄 Refresh Now</button>
         </div>
         <button class="btn btn-admin btn-sm" onclick="showSec('create-test')">+ Create New</button>
@@ -184,6 +210,18 @@
       <div id="admin-leaderboard-body"><div style="text-align:center;padding:3rem;color:var(--muted)">Select an assessment to view rankings.</div></div>
     </section>
 
+    <!-- ── ANALYTICS (AUTHORITY ONLY) ── -->
+    <section id="sec-analytics" class="hidden authority-only">
+      <div class="page-title">Test Analytics & Performance</div>
+      <p class="page-sub">Monitor engagement, completion rates, and performance trends</p>
+      <div class="filter-row">
+        <select id="an-test-select" onchange="loadTestAnalytics()" style="min-width:280px"><option value="">— Select an Assessment —</option></select>
+        <button class="btn btn-ghost btn-sm" onclick="loadTestAnalytics()">🔄 Refresh</button>
+      </div>
+      <div id="analytics-container" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;margin-top:1.5rem"></div>
+      <div id="analytics-charts" style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-top:2rem"></div>
+    </section>
+
     <!-- ── ALL ATHLETES (ADMIN ONLY) ── -->
     <section id="sec-athletes" class="hidden admin-only">
       <div class="page-title">All Athletes</div>
@@ -191,6 +229,9 @@
       <div class="filter-row">
         <input type="number" id="f-age-min" placeholder="Min Age" style="max-width:110px">
         <input type="number" id="f-age-max" placeholder="Max Age" style="max-width:110px">
+        <input type="text" id="f-ath-search" placeholder="Search name or email..." style="min-width:240px" onkeyup="loadAthletes()">
+        <select id="f-ath-sort"><option value="name">Sort: Name</option><option value="avg_score">Avg Score</option><option value="total_tests">Tests</option><option value="last_test">Last Test</option></select>
+        <select id="f-ath-sort-dir"><option value="asc">Asc</option><option value="desc">Desc</option></select>
         <select id="f-level"><option value="">All Levels</option><option>Advanced</option><option>Intermediate</option><option>Beginner</option></select>
         <select id="f-ex"><option value="">All Exercises</option><option value="pushup">Push-ups</option><option value="squat">Squats</option><option value="vertical_jump">Vertical Jump</option></select>
         <button class="btn btn-admin btn-sm" onclick="loadAthletes()">🔍 Filter</button>
@@ -209,7 +250,9 @@
       <div class="page-title">All Authorities</div>
       <p class="page-sub">Registered sports authorities and organizations</p>
       <div class="filter-row">
-        <input type="text" id="f-auth-search" placeholder="Search by name or email..." style="min-width:250px" onkeyup="filterAuthorities()">
+        <input type="text" id="f-auth-search" placeholder="Search by name or email..." style="min-width:250px" onkeyup="loadAuthorities()">
+        <select id="f-auth-sort"><option value="name">Sort: Name</option><option value="tests_created">Tests Created</option><option value="total_participants">Participants</option><option value="created_at">Joined</option></select>
+        <select id="f-auth-sort-dir"><option value="asc">Asc</option><option value="desc">Desc</option></select>
         <button class="btn btn-admin btn-sm" onclick="loadAuthorities()">🔄 Refresh</button>
       </div>
       <div class="card">
@@ -225,11 +268,16 @@
       <div class="page-title">All Test Results</div>
       <p class="page-sub">Every test submitted across the platform</p>
       <div class="filter-row">
+        <input type="text" id="fr-search" placeholder="Search athlete or exercise..." style="min-width:240px" onkeyup="loadResults()">
         <select id="fr-ex"><option value="">All Exercises</option><option value="pushup">Push-ups</option><option value="squat">Squats</option><option value="vertical_jump">Vertical Jump</option><option value="jumping_jack">Jumping Jacks</option><option value="situp">Sit-ups</option></select>
         <select id="fr-level"><option value="">All Levels</option><option>Advanced</option><option>Intermediate</option><option>Beginner</option></select>
         <select id="fr-cheat"><option value="">All Results</option><option value="flagged">Flagged Only</option><option value="clean">Clean Only</option></select>
+        <select id="fr-sort"><option value="created_at">Sort: Date</option><option value="athlete_name">Athlete</option><option value="exercise_type">Exercise</option><option value="avg_correctness_score">Score</option></select>
+        <select id="fr-sort-dir"><option value="desc">Desc</option><option value="asc">Asc</option></select>
         <button class="btn btn-admin btn-sm" onclick="loadResults()">🔍 Filter</button>
         <button class="btn btn-ghost btn-sm" onclick="loadResults(true)">🔄 Refresh</button>
+        <button class="btn btn-ghost btn-sm" onclick="downloadAdminResultsExport('csv')">⬇ CSV</button>
+        <button class="btn btn-ghost btn-sm" onclick="downloadAdminResultsExport('pdf')">📄 PDF</button>
       </div>
       <div class="card">
         <table class="tbl">
@@ -277,6 +325,8 @@ const user  = JSON.parse(localStorage.getItem('user') || 'null');
 let charts  = {};
 let allResults = null; // cache
 let aiTrendMetric = 'valid';
+let testTemplates = [];
+let editingTestId = null;
 
 // ── Guard ─────────────────────────────────────────────────────────────────
 if (!token || !user) {
@@ -305,6 +355,9 @@ if (!token || !user) {
   // Show appropriate default section based on role
   const defaultSection = user.role === 'authority' ? 'create-test' : 'overview';
   showSec(defaultSection);
+  if (user.role === 'authority') {
+    loadTestTemplates();
+  }
 }
 
 function logout() {
@@ -325,6 +378,205 @@ async function api(method, path, body=null) {
     if (e.message.includes('fetch')||e.message.includes('Failed')||e.message.includes('Network')) return demo(path);
     throw e;
   }
+}
+
+function parseCsvList(value) {
+  return String(value || '')
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean);
+}
+
+function clearTestForm() {
+  ['ct-name','ct-sport','ct-desc','ct-date','ct-time','ct-duration','ct-target-emails','ct-roster'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = id === 'ct-duration' ? '60' : '';
+  });
+  document.querySelectorAll('#ct-exercise-grid input').forEach(cb => cb.checked = false);
+  const first = document.querySelector('#ct-exercise-grid input');
+  if (first) first.checked = true;
+}
+
+function resetTestEditor() {
+  editingTestId = null;
+  clearTestForm();
+  const btn = document.getElementById('ct-submit-btn');
+  if (btn) btn.textContent = '📋 Publish Assessment →';
+  const title = document.querySelector('#sec-create-test .page-title');
+  if (title) title.textContent = 'Create Assessment';
+}
+
+async function loadTestTemplates() {
+  try {
+    const templates = await api('GET', '/test-templates');
+    testTemplates = templates || [];
+    const select = document.getElementById('ct-template-select');
+    if (!select) return;
+    const current = select.value;
+    const opts = testTemplates.map(t => `<option value="${t.id}">${t.name} • ${t.sport || 'General'}</option>`).join('');
+    select.innerHTML = '<option value="">— Select a Template —</option>' + opts;
+    if (current) select.value = current;
+  } catch (e) {
+    console.error('Failed to load templates:', e);
+  }
+}
+
+function loadTemplateIntoForm() {
+  const templateId = document.getElementById('ct-template-select')?.value;
+  if (!templateId) { toast('Select a template first', 'err'); return; }
+  const template = testTemplates.find(t => t.id === templateId);
+  if (!template) { toast('Template not found', 'err'); return; }
+  fillTestForm(template);
+  editingTestId = null;
+  const btn = document.getElementById('ct-submit-btn');
+  if (btn) btn.textContent = '📋 Publish Assessment →';
+}
+
+async function saveCurrentAsTemplate() {
+  const payload = buildTestPayload();
+  if (!payload) {
+    toast('Fill all required fields first', 'err');
+    return;
+  }
+  const templateName = prompt('Template name?', payload.name);
+  if (!templateName) return;
+  
+  try {
+    const templatePayload = {
+      name: templateName,
+      sport: payload.sport,
+      exercises: payload.exercises,
+      duration_minutes: payload.duration_minutes,
+      description: payload.description,
+      max_participants: payload.max_participants,
+      assigned_roster: payload.assigned_roster,
+      target_emails: payload.target_emails
+    };
+    const result = await api('POST', '/test-templates', templatePayload);
+    toast('Template saved! ✓', 'ok');
+    await loadTestTemplates();
+  } catch (e) {
+    console.error('Template save error:', e);
+    toast(`Template save failed: ${e.message}`, 'err');
+  }
+}
+
+function fillTestForm(test) {
+  document.getElementById('ct-name').value = test.name || '';
+  document.getElementById('ct-sport').value = test.sport || '';
+  document.getElementById('ct-desc').value = test.description || '';
+  document.getElementById('ct-date').value = test.scheduled_date || '';
+  document.getElementById('ct-time').value = test.start_time || '';
+  document.getElementById('ct-duration').value = test.duration_minutes || 60;
+  document.getElementById('ct-target-emails').value = Array.isArray(test.target_emails) ? test.target_emails.join(', ') : '';
+  document.getElementById('ct-roster').value = test.assigned_roster || '';
+  document.querySelectorAll('#ct-exercise-grid input').forEach(cb => cb.checked = false);
+  (test.exercises || []).forEach(ex => {
+    const value = ex.type || ex;
+    const checkbox = document.querySelector(`#ct-exercise-grid input[value="${value}"]`);
+    if (checkbox) checkbox.checked = true;
+  });
+}
+
+function buildTestPayload() {
+  const name = document.getElementById('ct-name').value.trim();
+  const sport = document.getElementById('ct-sport').value.trim();
+  const date = document.getElementById('ct-date').value;
+  const time = document.getElementById('ct-time').value;
+  const duration = parseInt(document.getElementById('ct-duration').value) || 60;
+  const desc = document.getElementById('ct-desc').value.trim();
+  const roster = document.getElementById('ct-roster').value.trim();
+  const targetEmails = parseCsvList(document.getElementById('ct-target-emails').value);
+  const checked = [...document.querySelectorAll('#ct-exercise-grid input:checked')].map(cb => cb.value);
+
+  if (!name || !sport || !date || !time || !checked.length) {
+    return null;
+  }
+
+  const totalWeight = 1 / checked.length;
+  const exercises = checked.map(t => ({ type: t, weight: Math.round(totalWeight * 100) / 100 }));
+  return { name, sport, exercises, scheduled_date: date, start_time: time, duration_minutes: duration, description: desc || null, max_participants: null, assigned_roster: roster || null, target_emails: targetEmails };
+}
+
+async function editTest(testId) {
+  try {
+    const test = await api('GET', `/tests/${testId}`);
+    if (!test) return;
+    editingTestId = testId;
+    fillTestForm(test);
+    const btn = document.getElementById('ct-submit-btn');
+    if (btn) btn.textContent = '💾 Update Assessment';
+    const title = document.querySelector('#sec-create-test .page-title');
+    if (title) title.textContent = 'Edit Assessment';
+    showSec('create-test');
+  } catch (e) {
+    toast(e.message, 'err');
+  }
+}
+
+async function toggleArchiveTest(testId, archive) {
+  try {
+    await api('PATCH', `/tests/${testId}/archive?archived=${archive ? 'true' : 'false'}`);
+    toast(archive ? 'Assessment archived' : 'Assessment restored', 'ok');
+    loadManageTests();
+  } catch (e) {
+    toast(e.message, 'err');
+  }
+}
+
+async function softDeleteTest(testId) {
+  if (!confirm('Soft delete this assessment? It will be archived and hidden from athletes.')) return;
+  try {
+    await api('DELETE', `/tests/${testId}`);
+    toast('Assessment archived', 'ok');
+    loadManageTests();
+  } catch (e) {
+    toast(e.message, 'err');
+  }
+}
+
+async function downloadAdminFile(path, filename) {
+  try {
+    const res = await fetch(`${API}${path}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.status === 401) { logout(); return; }
+    if (!res.ok) {
+      const text = await res.text().catch(() => 'Export failed');
+      throw new Error(text || `Export failed (${res.status})`);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    toast('Export downloaded', 'ok');
+  } catch (e) {
+    toast(e.message || 'Export failed', 'err');
+  }
+}
+
+function downloadAdminResultsExport(format) {
+  const params = new URLSearchParams();
+  const search = document.getElementById('fr-search')?.value.trim();
+  const exercise = document.getElementById('fr-ex')?.value;
+  const level = document.getElementById('fr-level')?.value;
+  const cheat = document.getElementById('fr-cheat')?.value;
+  const sortBy = document.getElementById('fr-sort')?.value;
+  const sortDir = document.getElementById('fr-sort-dir')?.value;
+  if (search) params.set('q', search);
+  if (exercise) params.set('exercise_type', exercise);
+  if (level) params.set('fitness_level', level);
+  if (cheat) params.set('cheat', cheat);
+  if (sortBy) params.set('sort_by', sortBy);
+  if (sortDir) params.set('sort_dir', sortDir);
+  params.set('format', format);
+  const filename = `admin_results.${format}`;
+  downloadAdminFile(`/admin/results/export?${params.toString()}`, filename);
 }
 
 // ── Demo data ──────────────────────────────────────────────────────────────
@@ -479,6 +731,8 @@ function showSec(s) {
     autoRefreshInterval = setInterval(function() { loadManageTests(); }, 60000);
   }
   else if (s==='leaderboard-admin') { populateAdminTestSelect(); loadAdminLeaderboard(); }
+  else if (s==='analytics') { populateAnalyticsTestSelect(); loadTestAnalytics(); }
+  else if (s==='create-test') { loadTestTemplates(); }
 }
 
 // ── Overview ───────────────────────────────────────────────────────────────
@@ -668,10 +922,16 @@ async function loadAthletes() {
     const p = new URLSearchParams();
     const mn = document.getElementById('f-age-min')?.value;
     const mx = document.getElementById('f-age-max')?.value;
+    const q = document.getElementById('f-ath-search')?.value.trim();
+    const sortBy = document.getElementById('f-ath-sort')?.value;
+    const sortDir = document.getElementById('f-ath-sort-dir')?.value;
     const lv = document.getElementById('f-level')?.value;
     const ex = document.getElementById('f-ex')?.value;
     if (mn) p.append('age_min',mn);
     if (mx) p.append('age_max',mx);
+    if (q) p.append('q', q);
+    if (sortBy) p.append('sort_by', sortBy);
+    if (sortDir) p.append('sort_dir', sortDir);
     if (lv) p.append('fitness_level',lv);
     if (ex) p.append('exercise_type',ex);
     if (p.toString()) url += '?' + p.toString();
@@ -695,19 +955,25 @@ async function loadAthletes() {
 }
 
 function clearFilters() {
-  ['f-age-min','f-age-max','f-level','f-ex'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  ['f-age-min','f-age-max','f-level','f-ex','f-ath-search','f-ath-sort','f-ath-sort-dir'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  const athSort = document.getElementById('f-ath-sort'); if (athSort) athSort.value = 'name';
+  const athSortDir = document.getElementById('f-ath-sort-dir'); if (athSortDir) athSortDir.value = 'asc';
   loadAthletes();
 }
 
 // ── All Authorities ────────────────────────────────────────────────────────
-let cachedAuthorities = null;
-
 async function loadAuthorities() {
   const tb = document.getElementById('authorities-body');
   tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:2rem">Loading...</td></tr>';
   try {
-    const authorities = await api('GET', '/admin/authorities');
-    cachedAuthorities = authorities;
+    const params = new URLSearchParams();
+    const q = document.getElementById('f-auth-search')?.value.trim();
+    const sortBy = document.getElementById('f-auth-sort')?.value;
+    const sortDir = document.getElementById('f-auth-sort-dir')?.value;
+    if (q) params.append('q', q);
+    if (sortBy) params.append('sort_by', sortBy);
+    if (sortDir) params.append('sort_dir', sortDir);
+    const authorities = await api('GET', `/admin/authorities${params.toString() ? `?${params.toString()}` : ''}`);
 
     if (!authorities?.length) {
       tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:2rem">No authorities found</td></tr>';
@@ -733,27 +999,7 @@ function renderAuthorities(authorities) {
 }
 
 function filterAuthorities() {
-  if (!cachedAuthorities) return;
-
-  const searchTerm = document.getElementById('f-auth-search')?.value.toLowerCase().trim();
-
-  if (!searchTerm) {
-    renderAuthorities(cachedAuthorities);
-    return;
-  }
-
-  const filtered = cachedAuthorities.filter(auth =>
-    auth.name.toLowerCase().includes(searchTerm) ||
-    auth.email.toLowerCase().includes(searchTerm)
-  );
-
-  const tb = document.getElementById('authorities-body');
-  if (!filtered.length) {
-    tb.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:2rem">No authorities match your search</td></tr>';
-    return;
-  }
-
-  renderAuthorities(filtered);
+  loadAuthorities();
 }
 
 // ── All Results ────────────────────────────────────────────────────────────
@@ -761,16 +1007,21 @@ async function loadResults(forceRefresh=false) {
   const tb = document.getElementById('results-body');
   tb.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:2rem">Loading...</td></tr>';
   try {
-    if (!allResults || forceRefresh) allResults = await api('GET','/admin/results');
-    let res = [...(allResults||[])];
-
+    const params = new URLSearchParams();
+    const search = document.getElementById('fr-search')?.value.trim();
     const ef  = document.getElementById('fr-ex')?.value;
     const lf  = document.getElementById('fr-level')?.value;
     const chf = document.getElementById('fr-cheat')?.value;
-    if (ef)  res = res.filter(r=>r.exercise_type===ef);
-    if (lf)  res = res.filter(r=>r.fitness_level===lf);
-    if (chf==='flagged') res = res.filter(r=>r.cheat_detected);
-    if (chf==='clean')   res = res.filter(r=>!r.cheat_detected);
+    const sortBy = document.getElementById('fr-sort')?.value;
+    const sortDir = document.getElementById('fr-sort-dir')?.value;
+    if (search) params.append('q', search);
+    if (ef) params.append('exercise_type', ef);
+    if (lf) params.append('fitness_level', lf);
+    if (chf) params.append('cheat', chf);
+    if (sortBy) params.append('sort_by', sortBy);
+    if (sortDir) params.append('sort_dir', sortDir);
+    const res = await api('GET', `/admin/results${params.toString() ? `?${params.toString()}` : ''}`);
+    allResults = res;
 
     if (!res.length) {
       tb.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:2rem">No results found</td></tr>';
@@ -799,8 +1050,7 @@ async function loadFlags() {
   const tb = document.getElementById('flags-body');
   tb.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:2rem">Loading...</td></tr>';
   try {
-    if (!allResults) allResults = await api('GET','/admin/results');
-    const flagged = (allResults||[]).filter(r=>r.cheat_detected);
+    const flagged = await api('GET','/admin/results?cheat=flagged');
 
     // Summary banner
     document.getElementById('flags-summary').innerHTML = flagged.length
@@ -832,36 +1082,31 @@ async function loadFlags() {
 
 // ── Create Test ────────────────────────────────────────────────────────────
 async function submitCreateTest() {
-  const name     = document.getElementById('ct-name').value.trim();
-  const sport    = document.getElementById('ct-sport').value.trim();
-  const date     = document.getElementById('ct-date').value;
-  const time     = document.getElementById('ct-time').value;
-  const duration = parseInt(document.getElementById('ct-duration').value) || 60;
-  const desc     = document.getElementById('ct-desc').value.trim();
-  const errEl    = document.getElementById('ct-error');
+  const errEl = document.getElementById('ct-error');
+  const payload = buildTestPayload();
   errEl.style.display = 'none';
-
-  const checked = [...document.querySelectorAll('#ct-exercise-grid input:checked')].map(cb=>cb.value);
-  if (!name)           { errEl.textContent='Test name is required'; errEl.style.display='block'; return; }
-  if (!sport)          { errEl.textContent='Sport is required'; errEl.style.display='block'; return; }
-  if (!date)           { errEl.textContent='Date is required'; errEl.style.display='block'; return; }
-  if (!time)           { errEl.textContent='Start time is required'; errEl.style.display='block'; return; }
-  if (!checked.length) { errEl.textContent='Select at least one exercise'; errEl.style.display='block'; return; }
-
-  const totalWeight = 1 / checked.length;
-  const exercises = checked.map(t => ({ type: t, weight: Math.round(totalWeight * 100) / 100 }));
+  if (!payload) {
+    errEl.textContent = 'Fill in the required fields and select at least one exercise';
+    errEl.style.display = 'block';
+    return;
+  }
 
   const btn = document.getElementById('ct-submit-btn');
-  btn.textContent = 'Publishing...'; btn.disabled = true;
+  const isEditing = !!editingTestId;
+  btn.textContent = isEditing ? 'Updating...' : 'Publishing...';
+  btn.disabled = true;
   try {
-    await api('POST', '/tests', { name, sport, exercises, scheduled_date: date, start_time: time, duration_minutes: duration, description: desc || null });
-    toast('Assessment published! Athletes have been notified.', 'ok');
-    // Reset form
-    ['ct-name','ct-sport','ct-desc'].forEach(id=>document.getElementById(id).value='');
-    document.querySelectorAll('#ct-exercise-grid input').forEach(cb=>cb.checked=false);
+    if (isEditing) {
+      await api('PATCH', `/tests/${editingTestId}`, payload);
+      toast('Assessment updated.', 'ok');
+    } else {
+      await api('POST', '/tests', { ...payload, template_id: document.getElementById('ct-template-select')?.value || null });
+      toast('Assessment published! Athletes have been notified.', 'ok');
+    }
+    resetTestEditor();
     setTimeout(()=>showSec('manage-tests'), 800);
   } catch(e) { errEl.textContent = e.message; errEl.style.display='block'; }
-  finally { btn.textContent='📋 Publish Assessment →'; btn.disabled=false; }
+  finally { btn.textContent = isEditing ? '💾 Update Assessment' : '📋 Publish Assessment →'; btn.disabled=false; }
 }
 
 // ── Manage Tests ───────────────────────────────────────────────────────────
@@ -870,18 +1115,30 @@ async function loadManageTests() {
   container.innerHTML = '<div style="text-align:center;padding:3rem;color:var(--muted)">Loading...</div>';
   try {
     const statusFilter = document.getElementById('mt-status-filter').value;
-    const url = statusFilter ? `/tests?status=${statusFilter}` : '/tests';
+    const search = document.getElementById('mt-search')?.value.trim();
+    const sortBy = document.getElementById('mt-sort')?.value;
+    const sortDir = document.getElementById('mt-sort-dir')?.value;
+    const includeArchived = document.getElementById('mt-include-archived')?.checked;
+    const params = new URLSearchParams();
+    if (statusFilter) params.append('status', statusFilter);
+    if (search) params.append('q', search);
+    if (sortBy) params.append('sort_by', sortBy);
+    if (sortDir) params.append('sort_dir', sortDir);
+    if (includeArchived) params.append('include_archived', 'true');
+    const url = `/tests${params.toString() ? `?${params.toString()}` : ''}`;
     const tests = await api('GET', url);
     if (!tests?.length) { container.innerHTML='<div style="text-align:center;padding:3rem;color:var(--muted)">No assessments found. <a href="#" onclick="showSec(\'create-test\')" style="color:var(--purple)">Create one →</a></div>'; return; }
     container.innerHTML = tests.map(t=>{
-      const statusColor = {upcoming:'var(--amber)',active:'var(--green)',completed:'var(--purple)'}[t.status]||'var(--muted)';
+      const isArchived = !!(t.is_archived || t.archived);
+      const badgeClass = t.status === 'active' ? 'green' : t.status === 'completed' ? 'purple' : 'amber';
       const exList = (t.exercises||[]).map(e=>fmtEx(e.type||e)).join(', ');
-      return `<div class="test-card">
+      return `<div class="test-card" style="opacity:${isArchived ? 0.72 : 1}">
         <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:1rem">
           <div style="flex:1;min-width:220px">
             <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.35rem;flex-wrap:wrap">
               <span style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem;letter-spacing:.5px">${t.name}</span>
-              <span class="badge badge-${t.status==='active'?'green':t.status==='completed'?'purple':'amber'}" style="font-size:.6rem">${t.status.toUpperCase()}</span>
+              <span class="badge badge-${badgeClass}" style="font-size:.6rem">${t.status.toUpperCase()}</span>
+              ${isArchived ? '<span class="badge badge-purple" style="font-size:.6rem">ARCHIVED</span>' : ''}
             </div>
             <div style="font-size:.8rem;color:var(--muted);margin-bottom:.4rem">
               <span style="margin-right:.75rem">🏅 ${t.sport||'—'}</span>
@@ -892,13 +1149,16 @@ async function loadManageTests() {
             <div style="font-size:.75rem;color:var(--muted)">Exercises: ${exList||'TBD'}</div>
           </div>
           <div style="display:flex;flex-direction:column;gap:.5rem;align-items:flex-end">
-            <div style="display:flex;align-items:center;gap:.75rem;font-size:.8rem">
+            <div style="display:flex;align-items:center;gap:.75rem;font-size:.8rem;flex-wrap:wrap;justify-content:flex-end">
               <span style="font-family:'JetBrains Mono',monospace;font-size:.62rem;color:var(--muted);text-transform:uppercase">Status:</span>
-              <span class="badge badge-${t.status==='active'?'green':t.status==='completed'?'purple':'amber'}" style="font-size:.7rem;font-weight:600;cursor:help" title="Automatically updated based on scheduled date and time">🔄 ${t.status.toUpperCase()}</span>
+              <span class="badge badge-${badgeClass}" style="font-size:.7rem;font-weight:600;cursor:help" title="Automatically updated based on scheduled date and time">🔄 ${t.status.toUpperCase()}</span>
             </div>
-            <div style="display:flex;gap:.5rem">
+            <div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:flex-end">
               <button class="btn btn-ghost btn-sm" onclick="loadTestParticipants('${t.id}','${t.name}')">👥 Participants</button>
               <button class="btn btn-ghost btn-sm" onclick="goToLeaderboard('${t.id}')">🏆 Leaderboard</button>
+              <button class="btn btn-ghost btn-sm" onclick="editTest('${t.id}')">✏️ Edit</button>
+              <button class="btn btn-ghost btn-sm" onclick="toggleArchiveTest('${t.id}', ${isArchived ? 'false' : 'true'})">${isArchived ? '↩️ Restore' : '📦 Archive'}</button>
+              <button class="btn btn-ghost btn-sm" onclick="softDeleteTest('${t.id}')">🗑 Delete</button>
             </div>
           </div>
         </div>
@@ -977,6 +1237,98 @@ async function loadAdminLeaderboard() {
     window._lbEntries = entries;
     window._lbTestId  = testId;
   } catch(e) { body.innerHTML=`<div style="text-align:center;padding:2rem;color:var(--red)">${e.message}</div>`; }
+}
+
+async function loadTestAnalytics() {
+  const testId = document.getElementById('an-test-select').value;
+  const container = document.getElementById('analytics-container');
+  const charts = document.getElementById('analytics-charts');
+  if (!testId) {
+    container.innerHTML = '<div class="card" style="text-align:center;padding:2rem;color:var(--muted);grid-column:1/-1">Select an assessment to view analytics.</div>';
+    charts.innerHTML = '';
+    return;
+  }
+  container.innerHTML = '<div class="card" style="text-align:center;padding:2rem;color:var(--muted);grid-column:1/-1">Loading analytics...</div>';
+  charts.innerHTML = '';
+  try {
+    const analytics = await api('GET', `/tests/${testId}/analytics`);
+    
+    // Render stat cards
+    container.innerHTML = `
+      <div class="card" style="padding:1.5rem;border-left:4px solid var(--purple)">
+        <div style="font-size:.75rem;color:var(--muted);margin-bottom:.5rem;text-transform:uppercase">Registered</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:2.5rem;color:var(--purple)">${analytics.total_registered}</div>
+      </div>
+      <div class="card" style="padding:1.5rem;border-left:4px solid var(--green)">
+        <div style="font-size:.75rem;color:var(--muted);margin-bottom:.5rem;text-transform:uppercase">Completed</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:2.5rem;color:var(--green)">${analytics.total_completed}</div>
+      </div>
+      <div class="card" style="padding:1.5rem;border-left:4px solid var(--amber)">
+        <div style="font-size:.75rem;color:var(--muted);margin-bottom:.5rem;text-transform:uppercase">Completion Rate</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:2.5rem;color:var(--amber)">${analytics.completion_rate}%</div>
+      </div>
+      <div class="card" style="padding:1.5rem;border-left:4px solid var(--cyan)">
+        <div style="font-size:.75rem;color:var(--muted);margin-bottom:.5rem;text-transform:uppercase">Avg Score</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:2.5rem;color:var(--cyan)">${analytics.avg_score}</div>
+      </div>
+      <div class="card" style="padding:1.5rem;border-left:4px solid var(--red)">
+        <div style="font-size:.75rem;color:var(--muted);margin-bottom:.5rem;text-transform:uppercase">Cheat Flags</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:2.5rem;color:var(--red)">${analytics.cheat_flags}</div>
+      </div>
+    `;
+    
+    // Store for chart rendering
+    window._analytics = analytics;
+    
+    // Render performance chart by exercise
+    if (analytics.exercise_performance && Object.keys(analytics.exercise_performance).length > 0) {
+      const exData = Object.entries(analytics.exercise_performance);
+      const exLabels = exData.map(([k,v]) => fmtEx(k));
+      const exScores = exData.map(([k,v]) => v.avg_score || 0);
+      const exReps = exData.map(([k,v]) => v.avg_reps || 0);
+      
+      charts.innerHTML = `
+        <div class="card" style="padding:1.5rem">
+          <div class="section-title">Exercise Performance</div>
+          <canvas id="ex-score-chart" style="max-height:300px"></canvas>
+        </div>
+        <div class="card" style="padding:1.5rem">
+          <div class="section-title">Average Reps by Exercise</div>
+          <canvas id="ex-reps-chart" style="max-height:300px"></canvas>
+        </div>
+      `;
+      
+      setTimeout(()=>{
+        if (window.Chart) {
+          new Chart(document.getElementById('ex-score-chart'), {
+            type: 'bar',
+            data: {labels:exLabels,datasets:[{label:'Avg Form Score',data:exScores,backgroundColor:'rgba(166,134,255,0.7)',borderColor:'var(--purple)',borderWidth:2}]},
+            options:{responsive:true,maintainAspectRatio:true,scales:{y:{beginAtZero:true,max:100}},plugins:{legend:{display:false}}}
+          });
+          new Chart(document.getElementById('ex-reps-chart'), {
+            type: 'bar',
+            data: {labels:exLabels,datasets:[{label:'Avg Reps',data:exReps,backgroundColor:'rgba(74,222,128,0.7)',borderColor:'var(--green)',borderWidth:2}]},
+            options:{responsive:true,maintainAspectRatio:true,scales:{y:{beginAtZero:true}},plugins:{legend:{display:false}}}
+          });
+        }
+      }, 100);
+    }
+  } catch(e) {
+    container.innerHTML = `<div class="card" style="text-align:center;padding:2rem;color:var(--red);grid-column:1/-1">${e.message}</div>`;
+  }
+}
+
+async function populateAnalyticsTestSelect() {
+  try {
+    const tests = await api('GET', '/tests');
+    const sel = document.getElementById('an-test-select');
+    if (!sel) return;
+    const current = sel.value;
+    sel.innerHTML = '<option value="">— Select an Assessment —</option>' + tests.map(t => `<option value="${t.id}">${t.name} • ${t.sport || 'General'}</option>`).join('');
+    if (current) sel.value = current;
+  } catch (e) {
+    console.error('Failed to load test list for analytics:', e);
+  }
 }
 
 function toggleShortlist(testId, userId, el) {
