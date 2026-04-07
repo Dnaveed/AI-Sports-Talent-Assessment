@@ -834,6 +834,7 @@ function setAiTrendMetric(mode) {
 
 function renderAiTrendChart(series) {
   const canvas = document.getElementById('ai-trend-chart');
+  const container = canvas?.parentElement;
   if (!canvas || !window.Chart) return;
   window.__lastAiTrendSeries = Array.isArray(series) ? series : [];
 
@@ -852,12 +853,41 @@ function renderAiTrendChart(series) {
     .filter(p => p.date)
     .sort((a, b) => a.date.localeCompare(b.date));
 
+  // Destroy previous chart if it exists
+  if (charts.aiTrend) charts.aiTrend.destroy();
+
+  // If no data, show a placeholder message
+  if (safeSeries.length === 0) {
+    canvas.style.display = 'none';
+    if (container) {
+      // Create a message element if it doesn't exist
+      let msg = container.querySelector('.ai-chart-message');
+      if (!msg) {
+        msg = document.createElement('div');
+        msg.className = 'ai-chart-message';
+        container.appendChild(msg);
+      }
+      msg.style.display = 'flex';
+      msg.style.alignItems = 'center';
+      msg.style.justifyContent = 'center';
+      msg.style.height = '250px';
+      msg.style.color = 'var(--muted)';
+      msg.style.fontSize = '.9rem';
+      msg.innerHTML = '⏳ No AI trend data yet. Results will appear as athletes submit assessments.';
+    }
+    return;
+  }
+
+  // Show canvas and hide message
+  canvas.style.display = 'block';
+  const msg = container?.querySelector('.ai-chart-message');
+  if (msg) msg.style.display = 'none';
+
   const labels = safeSeries.map(p => p.date.slice(5));
   const useOverall = aiTrendMetric === 'overall';
   const confidence = safeSeries.map(p => useOverall ? p.confidence_score : (p.valid_confidence_score ?? p.confidence_score));
   const disagreement = safeSeries.map(p => p.rule_ml_disagreement);
 
-  if (charts.aiTrend) charts.aiTrend.destroy();
   charts.aiTrend = new Chart(canvas.getContext('2d'), {
     type: 'line',
     data: {

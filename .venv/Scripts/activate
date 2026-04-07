@@ -38,7 +38,7 @@ deactivate () {
 # unset irrelevant variables
 deactivate nondestructive
 
-VIRTUAL_ENV="C:\Users\hp\AI-Sports-Talent-Assessment\.venv"
+VIRTUAL_ENV="C:\Users\Rahul\OneDrive\Desktop\athletic ai\.venv"
 export VIRTUAL_ENV
 
 _OLD_VIRTUAL_PATH="$PATH"
