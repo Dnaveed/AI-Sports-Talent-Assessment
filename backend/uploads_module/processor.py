@@ -22,8 +22,8 @@ async def process_video_job(jid, sid, vpath, exercise_type, user_id):
     await db.processing_jobs.update_one({"_id": jid}, {"$set": {"status": "processing"}})
 
     try:
-        sys.path.insert(0, str(Path(__file__).parent.parent.parent / "pose_module"))
-        from pose_analyzer import VideoProcessor
+        sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+        from pose_module import VideoProcessor
         
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(None, lambda: VideoProcessor().process_video(vpath, exercise_type))
