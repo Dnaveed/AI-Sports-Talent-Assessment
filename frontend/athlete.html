@@ -321,8 +321,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script>
 const API = 'http://localhost:8000/api';
-const token = localStorage.getItem('token');
-const user  = JSON.parse(localStorage.getItem('user') || 'null');
+let token = null;
+let user  = null;
 let selectedEx = 'pushup', selectedFile = null, charts = {};
 let selectedFileUrl = null;
 let selectedFileSource = 'upload';
@@ -357,22 +357,91 @@ let liveStats = {
   state: { phase: 'up', minAngle: 180, maxAngle: 0, baselineAnkleY: null },
 };
 
-// Guard — redirect if not logged in or wrong role
-if (!token || !user) { window.location.href = 'login.html'; }
-else if (user.role === 'admin' || user.role === 'authority') { window.location.href = 'admin.html'; }
-else {
+function loadAuthFromStorage() {
+  try {
+    token = localStorage.getItem('token');
+    user = JSON.parse(localStorage.getItem('user') || 'null');
+  } catch (_) {
+    token = null;
+    user = null;
+  }
+}
+
+function enforceAthleteAuth() {
+  loadAuthFromStorage();
+  if (!token || !user) {
+    window.location.replace('login.html');
+    return false;
+  }
+  if (user.role === 'admin' || user.role === 'authority') {
+    window.location.replace('admin.html');
+    return false;
+  }
+  // Track which user this page was initialized for to detect back/forward to stale sessions
+  if (user.id) {
+    sessionStorage.setItem('currentUserId', String(user.id));
+  }
   document.getElementById('nav-avatar').textContent = user.name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
   document.getElementById('nav-name').textContent = user.name;
+  return true;
+}
+
+// Initial guard on load
+if (enforceAthleteAuth()) {
   showSec('dashboard');
 }
 
+// Prevent navigating away with Back while athlete is logged in
+(function lockHistoryForAthlete() {
+  try {
+    // Push a new history entry so Back first triggers popstate here
+    history.pushState(null, '', window.location.href);
+    if (window.__athleteHistoryLocked) return;
+    window.__athleteHistoryLocked = true;
+
+    window.addEventListener('popstate', () => {
+      const t = localStorage.getItem('token');
+      const u = JSON.parse(localStorage.getItem('user') || 'null');
+      if (t && u && u.role === 'athlete') {
+        // Re-push state to keep the user on this page
+        history.pushState(null, '', window.location.href);
+      } else {
+        // If not an authenticated athlete anymore, allow normal back behaviour
+        window.__athleteHistoryLocked = false;
+      }
+    });
+  } catch (_) {
+    // If history is unavailable, fail silently
+  }
+})();
+
+// When returning via browser Back/Forward, just ensure auth is still valid
+window.addEventListener('pageshow', () => {
+  loadAuthFromStorage();
+  if (!token || !user) {
+    // If the user is no longer authenticated, treat this as a logged-out state
+    // and send them back to the public landing page instead of the login screen.
+    window.location.replace('index.html');
+    return;
+  }
+  try {
+    const currentId = user?.id || '';
+    if (currentId) {
+      sessionStorage.setItem('currentUserId', String(currentId));
+    }
+  } catch (_) {
+    // Ignore storage issues; UI can continue with current state
+  }
+});
+
 function logout() {
   localStorage.removeItem('token'); localStorage.removeItem('user');
-  window.location.href = 'login.html';
+  window.location.href = 'index.html';
 }
 
 async function downloadExport(path, filename) {
   try {
+    const token = localStorage.getItem('token');
     const res = await fetch(`${API}${path}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -416,7 +485,8 @@ async function downloadHistoryExport(format) {
 }
 
 async function api(method, path, body=null, isForm=false) {
-  const h = { Authorization: `Bearer ${token}` };
+  const currentToken = localStorage.getItem('token');
+  const h = { Authorization: `Bearer ${currentToken}` };
   if (body && !isForm) h['Content-Type'] = 'application/json';
   try {
     const r = await fetch(`${API}${path}`, { method, headers: h, body: isForm ? body : (body ? JSON.stringify(body) : null) });

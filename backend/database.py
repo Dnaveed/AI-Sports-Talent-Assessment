@@ -65,9 +65,16 @@ async def lifespan(app):
     }
 
     if MONGO_URI.startswith("mongodb+srv://"):
-        mongo_client_kwargs.update({"tls": True, "server_api": ServerApi("1")})
+        mongo_client_kwargs.update({
+            "tls": True, 
+            "server_api": ServerApi("1"),
+            "tlsAllowInvalidCertificates": True,
+        })
         if certifi is not None:
-            mongo_client_kwargs["tlsCAFile"] = certifi.where()
+            try:
+                mongo_client_kwargs["tlsCAFile"] = certifi.where()
+            except Exception:
+                pass
         if MONGO_TLS_INSECURE or MONGO_TLS_ALLOW_INVALID_CERTS:
             mongo_client_kwargs["tlsAllowInvalidCertificates"] = True
         if MONGO_TLS_INSECURE or MONGO_TLS_ALLOW_INVALID_HOSTNAMES:
