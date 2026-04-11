@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 # ── File & Database ────────────────────────────────────────────────────────────
-UPLOAD_DIR = Path("./uploads")
+UPLOAD_DIR = Path(__file__).parent / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "athleteai-secret-key-change-in-production")
