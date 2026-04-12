@@ -321,8 +321,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script>
 const API = 'http://localhost:8000/api';
-let token = null;
-let user  = null;
+const token = localStorage.getItem('token');
+const user  = JSON.parse(localStorage.getItem('user') || 'null');
 let selectedEx = 'pushup', selectedFile = null, charts = {};
 let selectedFileUrl = null;
 let selectedFileSource = 'upload';
@@ -357,91 +357,22 @@ let liveStats = {
   state: { phase: 'up', minAngle: 180, maxAngle: 0, baselineAnkleY: null },
 };
 
-function loadAuthFromStorage() {
-  try {
-    token = localStorage.getItem('token');
-    user = JSON.parse(localStorage.getItem('user') || 'null');
-  } catch (_) {
-    token = null;
-    user = null;
-  }
-}
-
-function enforceAthleteAuth() {
-  loadAuthFromStorage();
-  if (!token || !user) {
-    window.location.replace('login.html');
-    return false;
-  }
-  if (user.role === 'admin' || user.role === 'authority') {
-    window.location.replace('admin.html');
-    return false;
-  }
-  // Track which user this page was initialized for to detect back/forward to stale sessions
-  if (user.id) {
-    sessionStorage.setItem('currentUserId', String(user.id));
-  }
+// Guard — redirect if not logged in or wrong role
+if (!token || !user) { window.location.href = 'login.html'; }
+else if (user.role === 'admin' || user.role === 'authority') { window.location.href = 'admin.html'; }
+else {
   document.getElementById('nav-avatar').textContent = user.name.split(' ').map(n=>n[0]).join('').substring(0,2).toUpperCase();
   document.getElementById('nav-name').textContent = user.name;
-  return true;
-}
-
-// Initial guard on load
-if (enforceAthleteAuth()) {
   showSec('dashboard');
 }
 
-// Prevent navigating away with Back while athlete is logged in
-(function lockHistoryForAthlete() {
-  try {
-    // Push a new history entry so Back first triggers popstate here
-    history.pushState(null, '', window.location.href);
-    if (window.__athleteHistoryLocked) return;
-    window.__athleteHistoryLocked = true;
-
-    window.addEventListener('popstate', () => {
-      const t = localStorage.getItem('token');
-      const u = JSON.parse(localStorage.getItem('user') || 'null');
-      if (t && u && u.role === 'athlete') {
-        // Re-push state to keep the user on this page
-        history.pushState(null, '', window.location.href);
-      } else {
-        // If not an authenticated athlete anymore, allow normal back behaviour
-        window.__athleteHistoryLocked = false;
-      }
-    });
-  } catch (_) {
-    // If history is unavailable, fail silently
-  }
-})();
-
-// When returning via browser Back/Forward, just ensure auth is still valid
-window.addEventListener('pageshow', () => {
-  loadAuthFromStorage();
-  if (!token || !user) {
-    // If the user is no longer authenticated, treat this as a logged-out state
-    // and send them back to the public landing page instead of the login screen.
-    window.location.replace('index.html');
-    return;
-  }
-  try {
-    const currentId = user?.id || '';
-    if (currentId) {
-      sessionStorage.setItem('currentUserId', String(currentId));
-    }
-  } catch (_) {
-    // Ignore storage issues; UI can continue with current state
-  }
-});
-
 function logout() {
   localStorage.removeItem('token'); localStorage.removeItem('user');
-  window.location.href = 'index.html';
+  window.location.href = 'login.html';
 }
 
 async function downloadExport(path, filename) {
   try {
-    const token = localStorage.getItem('token');
     const res = await fetch(`${API}${path}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -485,8 +416,7 @@ async function downloadHistoryExport(format) {
 }
 
 async function api(method, path, body=null, isForm=false) {
-  const currentToken = localStorage.getItem('token');
-  const h = { Authorization: `Bearer ${currentToken}` };
+  const h = { Authorization: `Bearer ${token}` };
   if (body && !isForm) h['Content-Type'] = 'application/json';
   try {
     const r = await fetch(`${API}${path}`, { method, headers: h, body: isForm ? body : (body ? JSON.stringify(body) : null) });
@@ -666,6 +596,11 @@ function renderProgress(progress) {
     badgeWrap.innerHTML = badges.length
       ? badges.map(b => `<span class="badge badge-cyan" title="${b.description}">${b.title}</span>`).join('')
       : '<span class="badge badge-amber">No badges yet</span>';
+  }
+
+  const summaryNote = document.getElementById('progress-summary-note');
+  if (summaryNote) {
+    summaryNote.textContent = summary.total_tests ? `${summary.total_tests} tests completed` : 'No tests yet';
   }
 }
 
@@ -1124,8 +1059,7 @@ async function startRecording() {
     setSelectedVideo(file, 'camera');
     document.getElementById('camera-file-info').classList.remove('hidden');
     document.getElementById('camera-file-size').textContent = file.name + ' — ' + (blob.size/1024/1024).toFixed(1)+' MB';
-    document.getElementById('submit-btn').disabled = false;
-    toast(`Video recorded! Live AI: ${liveStats.validReps}/${liveStats.totalReps} valid reps. Ready for analysis!`,'ok');
+    toast(`Video recorded! Live AI: ${liveStats.validReps}/${liveStats.totalReps} valid reps`,'ok');
   };
   
   mediaRecorder.start();
@@ -1463,7 +1397,7 @@ async function loadProfile() {
 }
 async function saveProfile() {
   try {
-    await api('PUT','/profile',{
+    await api('PUT','/auth/profile',{
       name:document.getElementById('p-name').value||null,
       age:parseInt(document.getElementById('p-age').value)||null,
       height_cm:parseFloat(document.getElementById('p-height').value)||null,
@@ -1473,6 +1407,8 @@ async function saveProfile() {
       goal_primary_exercise:document.getElementById('p-goal-exercise').value||null,
     });
     toast('Profile updated!','ok');
+    // Reload dashboard to reflect new goals
+    loadDashboard();
   }catch(e){toast(e.message,'err');}
 }
 

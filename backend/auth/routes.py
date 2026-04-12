@@ -4,7 +4,7 @@ from datetime import datetime
 import uuid
 
 from database import get_db
-from models import RegisterRequest, LoginRequest
+from models import RegisterRequest, LoginRequest, UpdateProfileRequest
 from auth.utils import hash_password, create_token
 from dependencies import get_current_user
 
@@ -79,3 +79,34 @@ async def get_me(user=Depends(get_current_user)):
 
     from results.utils import serialize
     return serialize(doc)
+
+
+@router.put("/profile")
+async def update_profile(req: UpdateProfileRequest, user=Depends(get_current_user)):
+    """Update user profile and goals."""
+    db = get_db()
+    
+    update_fields = {}
+    if req.name is not None:
+        update_fields["name"] = req.name
+    if req.age is not None:
+        update_fields["age"] = req.age
+    if req.height_cm is not None:
+        update_fields["height_cm"] = req.height_cm
+    if req.weight_kg is not None:
+        update_fields["weight_kg"] = req.weight_kg
+    if req.goal_avg_score is not None:
+        update_fields["goal_avg_score"] = req.goal_avg_score
+    if req.goal_tests_per_week is not None:
+        update_fields["goal_tests_per_week"] = req.goal_tests_per_week
+    if req.goal_primary_exercise is not None:
+        update_fields["goal_primary_exercise"] = req.goal_primary_exercise
+    
+    if update_fields:
+        update_fields["updated_at"] = datetime.utcnow()
+        await db.users.update_one(
+            {"_id": user["user_id"]},
+            {"$set": update_fields}
+        )
+    
+    return {"success": True}

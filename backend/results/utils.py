@@ -126,9 +126,39 @@ def _compute_progress_summary(results: List[dict], user_doc: Optional[dict] = No
         "goal_tests_per_week": user_doc.get("goal_tests_per_week") if user_doc else None,
         "goal_primary_exercise": user_doc.get("goal_primary_exercise") if user_doc else None,
     }
+    
+    # Calculate goal progress based on multiple factors
     goal_progress = None
-    if goals.get("goal_avg_score"):
-        goal_progress = round(min(100.0, (avg_score / float(goals["goal_avg_score"])) * 100), 1) if goals["goal_avg_score"] else None
+    if goals.get("goal_avg_score") or goals.get("goal_tests_per_week"):
+        progress_components = []
+        
+        # Score goal progress
+        if goals.get("goal_avg_score") and goals["goal_avg_score"] > 0:
+            score_progress = min(100.0, (avg_score / float(goals["goal_avg_score"])) * 100)
+            progress_components.append(score_progress)
+        
+        # Weekly test goal progress
+        if goals.get("goal_tests_per_week") and goals["goal_tests_per_week"] > 0:
+            # Count tests in the last 7 days
+            now = datetime.now()
+            week_ago = now - timedelta(days=7)
+            tests_this_week = 0
+            for r in ordered:
+                created_at = r.get("created_at")
+                if isinstance(created_at, str):
+                    try:
+                        created_at = datetime.fromisoformat(created_at)
+                    except ValueError:
+                        continue
+                if isinstance(created_at, datetime) and created_at >= week_ago:
+                    tests_this_week += 1
+            
+            weekly_progress = min(100.0, (tests_this_week / float(goals["goal_tests_per_week"])) * 100)
+            progress_components.append(weekly_progress)
+        
+        # Average the progress components
+        if progress_components:
+            goal_progress = round(sum(progress_components) / len(progress_components), 1)
 
     badges = _compute_badges(ordered)
 
