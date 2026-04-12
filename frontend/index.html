@@ -280,6 +280,36 @@ const cntObs = new IntersectionObserver((entries) => {
   });
 });
 cntObs.observe(document.getElementById('cnt-exercises'));
+
+// If already logged in, redirect away from public landing
+function redirectIfLoggedInFromIndex() {
+  try {
+    const token = localStorage.getItem('token');
+    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    if (token && user && user.role) {
+      // Use replace so Back doesn't return here while logged in
+      if (user.role === 'admin') {
+        window.location.replace('admin.html');
+      } else if (user.role === 'authority') {
+        window.location.replace('authority.html');
+      } else {
+        window.location.replace('athlete.html');
+      }
+    }
+  } catch (_) {
+    // Ignore malformed storage
+  }
+}
+
+// Run on normal load
+window.addEventListener('load', redirectIfLoggedInFromIndex);
+
+// Also run when page is restored from back/forward cache
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) {
+    redirectIfLoggedInFromIndex();
+  }
+});
 </script>
 </body>
 </html>

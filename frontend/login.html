@@ -197,7 +197,13 @@ async function handleLogin() {
     localStorage.setItem('user', JSON.stringify(data.user));
 
     // Navigate to correct page
-    window.location.href = (role === 'admin' || role === 'authority') ? 'admin.html' : 'athlete.html';
+    if (role === 'admin') {
+      window.location.href = 'admin.html';
+    } else if (role === 'authority') {
+      window.location.href = 'authority.html';
+    } else {
+      window.location.href = 'athlete.html';
+    }
 
   } catch (e) {
     // Demo fallback if backend not running
@@ -223,16 +229,40 @@ function demoLogin(role) {
     : { id: 'u-demo',    name: 'Demo Athlete',  email: 'demo@athlete.com',        role: 'athlete' };
   localStorage.setItem('token', 'demo-token-' + role);
   localStorage.setItem('user', JSON.stringify(user));
-  window.location.href = adminRoles.includes(role) ? 'admin.html' : 'athlete.html';
+  if (role === 'admin') {
+    window.location.href = 'admin.html';
+  } else if (role === 'authority') {
+    window.location.href = 'authority.html';
+  } else {
+    window.location.href = 'athlete.html';
+  }
 }
 
-// Restore previous session
-window.addEventListener('load', () => {
-  const token = localStorage.getItem('token');
-  const user = JSON.parse(localStorage.getItem('user') || 'null');
-  if (token && user?.role) {
-    // Auto-redirect if already logged in
-    window.location.href = (user.role === 'admin' || user.role === 'authority') ? 'admin.html' : 'athlete.html';
+function redirectIfLoggedIn() {
+  try {
+    const token = localStorage.getItem('token');
+    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    if (token && user && user.role) {
+      if (user.role === 'admin') {
+        window.location.replace('admin.html');
+      } else if (user.role === 'authority') {
+        window.location.replace('authority.html');
+      } else {
+        window.location.replace('athlete.html');
+      }
+    }
+  } catch (_) {
+    // Ignore malformed storage
+  }
+}
+
+// Restore previous session on full load
+window.addEventListener('load', redirectIfLoggedIn);
+
+// Also handle back/forward cache restores
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) {
+    redirectIfLoggedIn();
   }
 });
 </script>

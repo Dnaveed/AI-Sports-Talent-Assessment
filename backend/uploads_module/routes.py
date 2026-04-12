@@ -104,6 +104,32 @@ async def job_status(job_id: str, user=Depends(get_current_user)):
     return serialize(doc)
 
 
+@router.get("/sessions/{session_id}/debug")
+async def debug_session(session_id: str, user=Depends(get_current_user)):
+    """Debug: show what's stored for a session."""
+    import os
+    db = get_db()
+    session = await db.test_sessions.find_one({"_id": session_id})
+    if not session:
+        return {"error": "session not found", "session_id": session_id}
+    video_path = session.get("video_path", "")
+    path_obj = Path(video_path) if video_path else None
+    backend_dir = Path(__file__).parent.parent
+    alt_path = backend_dir / path_obj if path_obj else None
+    return {
+        "session_id": session_id,
+        "video_path_in_db": video_path,
+        "path_is_absolute": path_obj.is_absolute() if path_obj else None,
+        "path_exists": path_obj.exists() if path_obj else None,
+        "alt_path": str(alt_path) if alt_path else None,
+        "alt_path_exists": alt_path.exists() if alt_path else None,
+        "cwd": os.getcwd(),
+        "backend_dir": str(backend_dir),
+        "uploads_dir": str(Path(__file__).parent.parent / "uploads"),
+        "uploads_files": [f.name for f in (Path(__file__).parent.parent / "uploads").iterdir()] if (Path(__file__).parent.parent / "uploads").exists() else [],
+    }
+
+
 @router.get("/sessions/{session_id}/video")
 async def get_session_video(session_id: str, user=Depends(get_current_user)):
     """Stream recorded video."""
@@ -134,6 +160,12 @@ async def get_session_video(session_id: str, user=Depends(get_current_user)):
         raise HTTPException(404, "Video not available")
 
     path_obj = Path(video_path)
+    # If stored path is relative or doesn't exist, try resolving against backend dir
+    if not path_obj.is_absolute() or not path_obj.exists():
+        backend_dir = Path(__file__).parent.parent  # backend/uploads_module -> backend
+        alt_path = backend_dir / path_obj
+        if alt_path.exists():
+            path_obj = alt_path
     if not path_obj.exists() or not path_obj.is_file():
         raise HTTPException(404, "Video file not found")
 

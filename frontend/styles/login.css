@@ -23,6 +23,10 @@
     overflow: hidden;
   }
 
+  @media (max-height: 700px) {
+    body { overflow: auto; }
+  }
+
   /* â”€â”€ animated background â”€â”€ */
   .bg-orbs {
     position: fixed; inset: 0; pointer-events: none; z-index: 0;
@@ -55,6 +59,7 @@
     display: flex; flex-direction: column; justify-content: center;
     padding: 4rem;
     position: relative; z-index: 1;
+    overflow-y: auto;
   }
 
   .right-panel {
@@ -64,6 +69,7 @@
     display: flex; flex-direction: column;
     justify-content: center; padding: 3rem;
     position: relative; z-index: 1;
+    overflow-y: auto;
   }
 
   /* â”€â”€ branding â”€â”€ */

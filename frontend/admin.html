@@ -109,16 +109,8 @@
     <section id="sec-create-test" class="hidden authority-only">
       <div class="page-title">Create Assessment</div>
       <p class="page-sub">Schedule a new physical fitness test for athletes</p>
-      <div style="display:grid;grid-template-columns:1fr 320px;gap:1.5rem;max-width:960px">
+      <div style="display:grid;grid-template-columns:1fr 320px;gap:1.5rem;max-width:960px;margin:0 auto;">
         <div>
-          <div class="card" style="margin-bottom:1rem">
-            <div class="section-title" style="margin-bottom:.875rem">Templates</div>
-            <div class="filter-row" style="margin-bottom:0">
-              <select id="ct-template-select" style="min-width:260px"><option value="">— Select a Template —</option></select>
-              <button class="btn btn-ghost btn-sm" onclick="loadTemplateIntoForm()">Load Template</button>
-              <button class="btn btn-ghost btn-sm" onclick="saveCurrentAsTemplate()">Save as Template</button>
-            </div>
-          </div>
           <div class="card" style="margin-bottom:1rem">
             <div class="section-title" style="margin-bottom:1.25rem">Test Details</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:.875rem;margin-bottom:.875rem">
@@ -170,7 +162,6 @@
             <div class="section-title" style="margin-bottom:.875rem">📋 Guidelines</div>
             <div style="font-size:.8rem;color:var(--muted);line-height:1.7">
               <div style="margin-bottom:.75rem">✅ Select at least one exercise for the test.</div>
-              <div style="margin-bottom:.75rem">✅ Use templates to standardize repeat assessments.</div>
               <div style="margin-bottom:.75rem">✅ Target athlete emails to limit the assessment to a cohort.</div>
               <div style="margin-bottom:.75rem">✅ Athletes get notified on their dashboard after you publish.</div>
               <div style="margin-bottom:.75rem">✅ Change status to <strong style="color:var(--green)">Active</strong> when the test starts.</div>
@@ -320,20 +311,38 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script>
 const API   = 'http://localhost:8000/api';
-const token = localStorage.getItem('token');
-const user  = JSON.parse(localStorage.getItem('user') || 'null');
+let token = null;
+let user  = null;
 let charts  = {};
 let allResults = null; // cache
 let aiTrendMetric = 'valid';
 let testTemplates = [];
 let editingTestId = null;
 
-// ── Guard ─────────────────────────────────────────────────────────────────
-if (!token || !user) {
-  window.location.href = 'login.html';
-} else if (user.role !== 'admin' && user.role !== 'authority') {
-  window.location.href = 'athlete.html';
-} else {
+function loadAdminAuthFromStorage() {
+  try {
+    token = localStorage.getItem('token');
+    user = JSON.parse(localStorage.getItem('user') || 'null');
+  } catch (_) {
+    token = null;
+    user = null;
+  }
+}
+
+function enforceAdminAuth() {
+  loadAdminAuthFromStorage();
+  if (!token || !user) {
+    window.top.location.replace('login.html');
+    return false;
+  }
+  if (user.role !== 'admin' && user.role !== 'authority') {
+    window.top.location.replace('athlete.html');
+    return false;
+  }
+  if (user.id) {
+    sessionStorage.setItem('currentUserId', String(user.id));
+  }
+
   // Set body class based on role
   document.body.className = `role-${user.role}`;
 
@@ -351,8 +360,11 @@ if (!token || !user) {
   } else {
     badge.innerHTML = `<span class="role-dot"></span>⚡ ADMIN PANEL`;
   }
+  return true;
+}
 
-  // Show appropriate default section based on role
+// Initial guard
+if (enforceAdminAuth()) {
   const defaultSection = user.role === 'authority' ? 'create-test' : 'overview';
   showSec(defaultSection);
   if (user.role === 'authority') {
@@ -360,14 +372,39 @@ if (!token || !user) {
   }
 }
 
+// Handle Back/Forward navigation restoring an old user view
+window.addEventListener('pageshow', (event) => {
+  loadAdminAuthFromStorage();
+  if (!token || !user) {
+    // If no longer authenticated, consider this a logged-out view and
+    // send the user back to the public landing page instead of login.
+    window.top.location.replace('index.html');
+    return;
+  }
+  try {
+    const storedId = sessionStorage.getItem('currentUserId') || '';
+    const currentId = user?.id || '';
+    if (storedId && currentId && storedId !== currentId) {
+      window.location.reload();
+      return;
+    }
+    if (!storedId && currentId) {
+      sessionStorage.setItem('currentUserId', String(currentId));
+    }
+  } catch (_) {
+    window.location.reload();
+  }
+});
+
 function logout() {
   localStorage.removeItem('token'); localStorage.removeItem('user');
-  window.location.href = 'login.html';
+  window.top.location.href = 'index.html';
 }
 
 // ── API helper ─────────────────────────────────────────────────────────────
 async function api(method, path, body=null) {
-  const h = { Authorization: `Bearer ${token}` };
+  const currentToken = localStorage.getItem('token');
+  const h = { Authorization: `Bearer ${currentToken}` };
   if (body) h['Content-Type'] = 'application/json';
   try {
     const r = await fetch(`${API}${path}`, { method, headers: h, body: body ? JSON.stringify(body) : null });
@@ -537,6 +574,7 @@ async function softDeleteTest(testId) {
 
 async function downloadAdminFile(path, filename) {
   try {
+    const token = localStorage.getItem('token');
     const res = await fetch(`${API}${path}`, {
       headers: { Authorization: `Bearer ${token}` },
     });

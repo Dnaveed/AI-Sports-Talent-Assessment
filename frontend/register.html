@@ -125,6 +125,26 @@
 const API = 'http://localhost:8000/api';
 let selectedRole = 'athlete';
 
+function redirectIfAlreadyRegistered() {
+  try {
+    const token = localStorage.getItem('token');
+    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    if (token && user && user.role) {
+      const dest = (user.role === 'admin' || user.role === 'authority') ? 'admin.html' : 'athlete.html';
+      window.location.replace(dest);
+    }
+  } catch (_) {
+    // Ignore malformed storage
+  }
+}
+
+window.addEventListener('load', redirectIfAlreadyRegistered);
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) {
+    redirectIfAlreadyRegistered();
+  }
+});
+
 function selectRole(role) {
   selectedRole = role;
 
@@ -213,7 +233,14 @@ async function handleRegister() {
     localStorage.setItem('user', JSON.stringify(user));
 
     showSuccess('Account created! Redirecting...');
-    const dest = finalRole === 'admin' || finalRole === 'authority' ? 'admin.html' : 'athlete.html';
+    let dest;
+    if (finalRole === 'admin') {
+      dest = 'admin.html';
+    } else if (finalRole === 'authority') {
+      dest = 'authority.html';
+    } else {
+      dest = 'athlete.html';
+    }
     setTimeout(() => { window.location.href = dest; }, 1200);
 
   } catch (e) {
@@ -223,7 +250,14 @@ async function handleRegister() {
       localStorage.setItem('token', 'demo-token-' + selectedRole);
       localStorage.setItem('user', JSON.stringify(user));
       showSuccess('Demo account ready! Redirecting...');
-      const dest = (selectedRole === 'admin' || selectedRole === 'authority') ? 'admin.html' : 'athlete.html';
+      let dest;
+      if (selectedRole === 'admin') {
+        dest = 'admin.html';
+      } else if (selectedRole === 'authority') {
+        dest = 'authority.html';
+      } else {
+        dest = 'athlete.html';
+      }
       setTimeout(() => { window.location.href = dest; }, 1200);
       return;
     }

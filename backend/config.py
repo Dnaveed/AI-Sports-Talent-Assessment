@@ -3,10 +3,11 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+# Ensure .env values override any existing OS env vars (e.g., old MONGO_URI)
+load_dotenv(override=True)
 
 # ── File & Database ────────────────────────────────────────────────────────────
-UPLOAD_DIR = Path("./uploads")
+UPLOAD_DIR = Path(__file__).parent / "uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "athleteai-secret-key-change-in-production")
