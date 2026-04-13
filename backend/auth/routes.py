@@ -1,11 +1,11 @@
 """Authentication routes - register, login, profile."""
 from fastapi import APIRouter, HTTPException, Depends
-from datetime import datetime
+from datetime import datetime, timedelta
 import uuid
 
 from database import get_db
-from models import RegisterRequest, LoginRequest
-from auth.utils import hash_password, create_token
+from models import RegisterRequest, LoginRequest, ForgotPasswordRequest, ResetPasswordRequest, UpdateProfileRequest
+from auth.utils import hash_password, create_token, generate_reset_token, send_reset_email
 from dependencies import get_current_user
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -79,3 +79,82 @@ async def get_me(user=Depends(get_current_user)):
 
     from results.utils import serialize
     return serialize(doc)
+
+
+@router.post("/forgot-password")
+async def forgot_password(req: ForgotPasswordRequest):
+    """Send password reset email. Always returns 200 to prevent email enumeration."""
+    db = get_db()
+    user = await db.users.find_one({"email": req.email})
+
+    if user:
+        token = generate_reset_token()
+        expires_at = datetime.utcnow() + timedelta(hours=1)
+
+        await db.password_resets.update_one(
+            {"email": req.email},
+            {"$set": {"token": token, "expires_at": expires_at, "used": False}},
+            upsert=True
+        )
+
+        send_reset_email(req.email, token)
+
+    # Always return success to prevent email enumeration
+    return {"message": "If that email is registered, a reset link has been sent."}
+
+
+@router.post("/reset-password")
+async def reset_password(req: ResetPasswordRequest):
+    """Reset password using a valid reset token."""
+    db = get_db()
+    record = await db.password_resets.find_one({
+        "token": req.token,
+        "used": False
+    })
+
+    if not record:
+        raise HTTPException(400, "Invalid or expired reset token")
+
+    if record["expires_at"] < datetime.utcnow():
+        raise HTTPException(400, "Reset token has expired")
+
+    new_hash = hash_password(req.new_password)
+    await db.users.update_one(
+        {"email": record["email"]},
+        {"$set": {"password_hash": new_hash}}
+    )
+
+    # Mark token as used
+    await db.password_resets.update_one(
+        {"token": req.token},
+        {"$set": {"used": True}}
+    )
+
+    return {"message": "Password reset successfully"}
+
+
+@router.put("/profile")
+async def update_profile(req: UpdateProfileRequest, user=Depends(get_current_user)):
+    """Update user profile and goals."""
+    db = get_db()
+    update_fields = {}
+    if req.name is not None:
+        update_fields["name"] = req.name
+    if req.age is not None:
+        update_fields["age"] = req.age
+    if req.height_cm is not None:
+        update_fields["height_cm"] = req.height_cm
+    if req.weight_kg is not None:
+        update_fields["weight_kg"] = req.weight_kg
+    if req.goal_avg_score is not None:
+        update_fields["goal_avg_score"] = req.goal_avg_score
+    if req.goal_tests_per_week is not None:
+        update_fields["goal_tests_per_week"] = req.goal_tests_per_week
+    if req.goal_primary_exercise is not None:
+        update_fields["goal_primary_exercise"] = req.goal_primary_exercise
+
+    if update_fields:
+        update_fields["updated_at"] = datetime.utcnow()
+        await db.users.update_one({"_id": user["user_id"]}, {"$set": update_fields})
+
+    return {"success": True}

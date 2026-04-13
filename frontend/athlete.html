@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AthleteAI — Athlete Dashboard</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='75' font-size='75' fill='%2300d4ff'>💪</text></svg>">
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles/athlete.css">
 </head>
 <body>
@@ -48,24 +47,24 @@
       </div>
       <div class="dashboard-charts" style="margin-bottom:1.25rem">
         <div class="card chart-card">
-          <div class="section-header"><span class="section-title">Progress Tracker</span><span style="font-size:.75rem;color:var(--muted)" id="progress-summary-note">Loading...</span></div>
+          <div class="section-header"><span class="section-title">Progress Tracker</span><span style="font-size:.75rem;color:var(--color-text-3)" id="progress-summary-note">Loading...</span></div>
           <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.75rem;margin-bottom:1rem">
             <div class="mini-stat"><div class="mini-stat-val" id="pg-total-tests">—</div><div class="mini-stat-label">Total Tests</div></div>
             <div class="mini-stat"><div class="mini-stat-val" id="pg-best-score">—</div><div class="mini-stat-label">Best Score</div></div>
             <div class="mini-stat"><div class="mini-stat-val" id="pg-score-delta">—</div><div class="mini-stat-label">Trend</div></div>
             <div class="mini-stat"><div class="mini-stat-val" id="pg-goal-progress">—</div><div class="mini-stat-label">Goal Progress</div></div>
           </div>
-          <div style="font-size:.8rem;color:var(--muted);margin-bottom:.75rem" id="progress-goal-text">No goals set yet.</div>
+          <div style="font-size:.875rem;color:var(--color-text-3);margin-bottom:.75rem" id="progress-goal-text">No goals set yet.</div>
           <div class="prog-bar" style="height:8px"><div class="prog-fill" id="goal-progress-fill" style="width:0%"></div></div>
           <div id="progress-badges" style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.9rem"></div>
         </div>
         <div class="card chart-card">
-          <div class="section-header"><span class="section-title">Notifications</span><span style="font-size:.75rem;color:var(--muted)" id="notification-count">0</span></div>
+          <div class="section-header"><span class="section-title">Notifications</span><span style="font-size:.75rem;color:var(--color-text-3)" id="notification-count">0</span></div>
           <div id="notification-list" style="display:flex;flex-direction:column;gap:.65rem;max-height:230px;overflow:auto"></div>
         </div>
       </div>
       <div class="dashboard-charts">
-        <div class="card chart-card"><div class="section-header"><span class="section-title">Form Score Trend</span><span style="font-size:.75rem;color:var(--muted)">Last 10 tests</span></div><canvas id="trend-chart" class="dashboard-chart"></canvas></div>
+        <div class="card chart-card"><div class="section-header"><span class="section-title">Form Score Trend</span><span style="font-size:.75rem;color:var(--color-text-3)">Last 10 tests</span></div><canvas id="trend-chart" class="dashboard-chart"></canvas></div>
         <div class="card chart-card"><div class="section-header"><span class="section-title">Exercise Mix</span></div><canvas id="dist-chart" class="dashboard-chart"></canvas></div>
       </div>
       <div class="card">
@@ -80,6 +79,28 @@
       <p class="page-sub">Upload a video and let AI analyze your movement</p>
       <div style="display:grid;grid-template-columns:1fr 320px;gap:1.5rem">
         <div>
+          <!-- STEP 0: SELECT ASSESSMENT -->
+          <div class="card" style="margin-bottom:1rem" id="test-select-card">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:.875rem">
+              <div class="section-title">0 — Select Assessment <span style="font-size:.75rem;color:var(--color-text-3);font-weight:400">(optional)</span></div>
+              <button class="btn btn-ghost btn-sm" onclick="loadUploadTests()" title="Refresh tests">🔄</button>
+            </div>
+            <div id="upload-test-loading" style="font-size:.82rem;color:var(--muted);display:none">Loading assessments...</div>
+            <select id="upload-test-select" onchange="onUploadTestChange()" style="width:100%;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);color:var(--color-text);font-size:.9rem;padding:.7rem 1rem;cursor:pointer;outline:none">
+              <option value="">— Free Practice (no assessment) —</option>
+            </select>
+            <div id="upload-test-info" style="display:none;margin-top:.75rem;background:var(--color-primary-t);border:1px solid var(--color-primary-s);border-radius:var(--radius-md);padding:.7rem 1rem;font-size:.875rem">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap">
+                <div>
+                  <span style="color:var(--cyan);font-weight:600" id="upload-test-name">—</span>
+                  <span style="color:var(--muted);margin-left:.5rem" id="upload-test-meta"></span>
+                </div>
+                <span class="badge" id="upload-test-status-badge">—</span>
+              </div>
+              <div style="margin-top:.4rem;color:var(--muted)">Exercises: <span style="color:var(--text)" id="upload-test-exercises">—</span></div>
+            </div>
+          </div>
+
           <div class="card" style="margin-bottom:1rem">
             <div class="section-title" style="margin-bottom:1rem">1 — Choose Exercise</div>
             <div class="exercise-grid">
@@ -94,66 +115,66 @@
           <div class="card" style="margin-bottom:1rem">
             <div class="section-title" style="margin-bottom:1rem">2 — Record Video</div>
             <!-- Camera Permission Request -->
-            <div id="camera-permission" style="background:linear-gradient(135deg,rgba(139,92,246,.1),rgba(0,212,255,.05));border:1px solid rgba(139,92,246,.3);border-radius:12px;padding:2rem;text-align:center;margin-bottom:1rem">
+            <div id="camera-permission" style="background:var(--color-primary-t);border:1px solid var(--color-primary-s);border-radius:var(--radius-xl);padding:2rem;text-align:center;margin-bottom:1rem">
               <div style="font-size:3rem;margin-bottom:1rem">🎥</div>
-              <div style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;letter-spacing:.5px;margin-bottom:.5rem">Enable Camera Access</div>
-              <div style="font-size:.85rem;color:var(--muted);margin-bottom:1.5rem">Click below to allow camera access and start recording your exercise</div>
-              <button class="btn btn-primary" style="width:100%;padding:.8rem;font-size:.95rem" onclick="requestCameraAccess()">📹 Open Camera</button>
+              <div style="font-size:1.1rem;font-weight:700;margin-bottom:.5rem">Enable Camera Access</div>
+              <div style="font-size:.875rem;color:var(--color-text-3);margin-bottom:1.5rem">Click below to allow camera access and start recording your exercise</div>
+              <button class="btn btn-primary" style="width:100%;height:42px;font-size:.95rem" onclick="requestCameraAccess()">📹 Open Camera</button>
             </div>
 
             <!-- Camera Preview (hidden until permission granted) -->
             <div id="camera-section" class="hidden">
-              <div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:1rem">
+              <div style="background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:var(--radius-xl);overflow:hidden;margin-bottom:1rem">
                 <div id="live-ai-wrap" style="position:relative">
                   <video id="camera-preview" style="width:100%;display:block;background:#000;border-radius:10px" autoplay playsinline></video>
                   <canvas id="pose-overlay" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none"></canvas>
                 </div>
               </div>
-              <div class="card" style="padding:1rem;margin-bottom:1rem;background:var(--surface2)">
+              <div class="card" style="padding:1rem;margin-bottom:1rem;background:var(--color-surface-2)">
                 <div style="display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-bottom:.7rem">
-                  <div style="font-family:'Bebas Neue',sans-serif;letter-spacing:.6px">Live AI Pose Detection</div>
+                  <div style="font-weight:700;font-size:.9rem">Live AI Pose Detection</div>
                   <span id="live-ai-status" class="badge badge-amber">Starting...</span>
                 </div>
                 <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.6rem;margin-bottom:.7rem">
-                  <div style="background:var(--surface3);border:1px solid var(--border);border-radius:8px;padding:.55rem .5rem;text-align:center">
-                    <div id="live-total" style="font-family:'Bebas Neue',sans-serif;font-size:1.5rem;line-height:1">0</div>
-                    <div style="font-size:.62rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase">Total Reps</div>
+                  <div style="background:var(--color-surface-3);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:.55rem .5rem;text-align:center">
+                    <div id="live-total" style="font-size:1.5rem;font-weight:800;line-height:1">0</div>
+                    <div style="font-size:.65rem;color:var(--color-text-3);text-transform:uppercase;letter-spacing:.05em">Total Reps</div>
                   </div>
-                  <div style="background:var(--surface3);border:1px solid var(--border);border-radius:8px;padding:.55rem .5rem;text-align:center">
-                    <div id="live-valid" style="font-family:'Bebas Neue',sans-serif;font-size:1.5rem;line-height:1;color:var(--green)">0</div>
-                    <div style="font-size:.62rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase">Valid Reps</div>
+                  <div style="background:var(--color-surface-3);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:.55rem .5rem;text-align:center">
+                    <div id="live-valid" style="font-size:1.5rem;font-weight:800;line-height:1;color:var(--color-success)">0</div>
+                    <div style="font-size:.65rem;color:var(--color-text-3);text-transform:uppercase;letter-spacing:.05em">Valid Reps</div>
                   </div>
-                  <div style="background:var(--surface3);border:1px solid var(--border);border-radius:8px;padding:.55rem .5rem;text-align:center">
-                    <div id="live-form" style="font-family:'Bebas Neue',sans-serif;font-size:1.5rem;line-height:1;color:var(--cyan)">0%</div>
-                    <div style="font-size:.62rem;color:var(--muted);font-family:'JetBrains Mono',monospace;text-transform:uppercase">Form</div>
+                  <div style="background:var(--color-surface-3);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:.55rem .5rem;text-align:center">
+                    <div id="live-form" style="font-size:1.5rem;font-weight:800;line-height:1;color:var(--color-primary)">0%</div>
+                    <div style="font-size:.65rem;color:var(--color-text-3);text-transform:uppercase;letter-spacing:.05em">Form</div>
                   </div>
                 </div>
-                <div id="live-feedback" style="font-size:.78rem;color:var(--muted)">Enable camera to start AI feedback.</div>
+                <div id="live-feedback" style="font-size:.8125rem;color:var(--color-text-3)">Enable camera to start AI feedback.</div>
               </div>
               <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:1rem">
-                <button class="btn btn-primary" id="record-btn" style="width:100%;padding:.8rem" onclick="startRecording()">⏺️ Start Recording</button>
-                <button class="btn btn-ghost" id="stop-btn" style="width:100%;padding:.8rem;display:none" onclick="stopRecording()">⏹️ Stop Recording</button>
+                <button class="btn btn-primary" id="record-btn" style="width:100%;height:42px" onclick="startRecording()">⏺️ Start Recording</button>
+                <button class="btn btn-ghost" id="stop-btn" style="width:100%;height:42px;display:none" onclick="stopRecording()">⏹️ Stop Recording</button>
               </div>
-              <div id="recording-status" style="display:flex;align-items:center;gap:.5rem;font-size:.85rem;color:var(--amber);font-family:'JetBrains Mono',monospace;display:none">
-                <div style="width:8px;height:8px;border-radius:50%;background:var(--red);animation:pulse 1s infinite"></div>
+              <div id="recording-status" style="display:flex;align-items:center;gap:.5rem;font-size:.875rem;color:var(--color-danger);display:none">
+                <div style="width:8px;height:8px;border-radius:50%;background:var(--color-danger);animation:pulse 1s infinite"></div>
                 <span id="recording-time">00:00</span>
               </div>
-              <div id="camera-file-info" class="hidden" style="margin-top:1rem;background:var(--surface2);border:1px solid var(--green);border-radius:8px;padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between">
-                <div><div style="font-weight:500;font-size:.875rem;color:var(--green)">✓ Video ready</div><div style="font-size:.75rem;color:var(--muted)" id="camera-file-size"></div></div>
-                <button class="btn btn-ghost btn-sm" onclick="clearCameraFile()" style="color:var(--red)">✕ Clear</button>
+              <div id="camera-file-info" class="hidden" style="margin-top:1rem;background:var(--color-success-s);border:1px solid rgba(22,163,74,0.2);border-radius:var(--radius-md);padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between">
+                <div><div style="font-weight:600;font-size:.875rem;color:var(--color-success)">✓ Video ready</div><div style="font-size:.75rem;color:var(--color-text-3)" id="camera-file-size"></div></div>
+                <button class="btn btn-ghost btn-sm" onclick="clearCameraFile()" style="color:var(--color-danger)">✕ Clear</button>
               </div>
-              <button class="btn btn-ghost" style="width:100%;padding:.6rem;font-size:.85rem;margin-top:.5rem" onclick="closeCameraAccess()">🔒 Close Camera</button>
+              <button class="btn btn-ghost" style="width:100%;height:34px;font-size:.875rem;margin-top:.5rem" onclick="closeCameraAccess()">🔒 Close Camera</button>
             </div>
 
-            <hr style="border:none;border-top:1px dashed var(--border);margin:1rem 0">
+            <hr style="border:none;border-top:1px solid var(--color-border);margin:1rem 0">
             <div>
-              <div style="background:var(--surface2);border:1px dashed var(--border);border-radius:12px;padding:1rem;display:flex;flex-direction:column;gap:.6rem">
-                <div style="display:flex;align-items:center;gap:.5rem;font-size:.9rem;font-weight:500">
+              <div style="background:var(--color-surface-2);border:1px dashed var(--color-border);border-radius:var(--radius-xl);padding:1rem;display:flex;flex-direction:column;gap:.6rem">
+                <div style="display:flex;align-items:center;gap:.5rem;font-size:.9rem;font-weight:600">
                   <span style="font-size:1.1rem">📤</span>
                   <span>Upload existing video</span>
                 </div>
-                <p style="font-size:.75rem;color:var(--muted);margin:0">MP4, MOV, WebM or AVI · up to 200MB</p>
-                <button type="button" class="btn btn-primary" style="padding:.65rem 1.2rem;font-size:.9rem;align-self:flex-start" onclick="document.getElementById('upload-input').click()">📁 Choose Video File</button>
+                <p style="font-size:.8125rem;color:var(--color-text-3);margin:0">MP4, MOV, WebM or AVI · up to 200MB</p>
+                <button type="button" class="btn btn-primary" style="align-self:flex-start" onclick="document.getElementById('upload-input').click()">📁 Choose Video File</button>
                 <input type="file" id="upload-input" accept="video/mp4,video/webm,video/quicktime,video/x-msvideo" onchange="handleFileUpload(this)" style="display:none">
               </div>
             </div>
@@ -166,14 +187,14 @@
               <div style="font-size:.8rem;color:var(--muted)">Supports MP4, MOV, WEBM, AVI</div>
               <input id="upload-video-input" type="file" accept="video/mp4,video/quicktime,video/webm,video/x-msvideo" onchange="handleVideoUpload(event)">
             </label>
-            <div id="upload-file-info" class="hidden" style="margin-top:1rem;background:var(--surface2);border:1px solid var(--green);border-radius:8px;padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between">
+            <div id="upload-file-info" class="hidden" style="margin-top:1rem;background:var(--color-success-s);border:1px solid rgba(22,163,74,0.2);border-radius:var(--radius-md);padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between">
               <div>
-                <div style="font-weight:500;font-size:.875rem;color:var(--green)">✓ Upload selected</div>
-                <div style="font-size:.75rem;color:var(--muted)" id="upload-file-meta"></div>
+                <div style="font-weight:600;font-size:.875rem;color:var(--color-success)">✓ Upload selected</div>
+                <div style="font-size:.75rem;color:var(--color-text-3)" id="upload-file-meta"></div>
               </div>
-              <button class="btn btn-ghost btn-sm" onclick="clearUploadedVideo()" style="color:var(--red)">✕ Clear</button>
+              <button class="btn btn-ghost btn-sm" onclick="clearUploadedVideo()" style="color:var(--color-danger)">✕ Clear</button>
             </div>
-            <div id="selected-preview-card" class="hidden" style="margin-top:1rem;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:1rem">
+            <div id="selected-preview-card" class="hidden" style="margin-top:1rem;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:var(--radius-xl);padding:1rem">
               <div style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;margin-bottom:.75rem">
                 <div class="section-title">Selected Video Preview</div>
                 <div style="display:flex;gap:.5rem;flex-wrap:wrap">
@@ -194,8 +215,8 @@
             <div class="instruction-step"><div class="step-num">2</div><div><div style="font-weight:500;font-size:.85rem">Good lighting</div><div style="color:var(--muted);font-size:.75rem;margin-top:2px">Avoid backlighting</div></div></div>
             <div class="instruction-step"><div class="step-num">3</div><div><div style="font-weight:500;font-size:.85rem">Face visible</div><div style="color:var(--muted);font-size:.75rem;margin-top:2px">Required for identity check</div></div></div>
             <div class="instruction-step" style="border:none"><div class="step-num">4</div><div><div style="font-weight:500;font-size:.85rem">10–120 seconds</div><div style="color:var(--muted);font-size:.75rem;margin-top:2px">Perform exercise naturally</div></div></div>
-            <hr style="border:none;border-top:1px solid var(--border);margin:1rem 0">
-            <div style="font-size:.75rem;color:var(--muted);margin-bottom:.5rem;font-weight:500">AI detects:</div>
+            <hr style="border:none;border-top:1px solid var(--color-border);margin:1rem 0">
+            <div style="font-size:.8125rem;color:var(--color-text-3);margin-bottom:.5rem;font-weight:500">AI detects:</div>
             <div style="display:flex;flex-wrap:wrap;gap:.35rem">
               <span class="badge badge-cyan">Rep Count</span>
               <span class="badge badge-purple">Form Score</span>
@@ -221,7 +242,7 @@
       <div class="card">
         <table class="tbl">
           <thead><tr><th>Exercise</th><th>Date</th><th>Reps</th><th>Form Score</th><th>Level</th><th>Grade</th><th>Cheat?</th><th>Recording</th><th></th></tr></thead>
-          <tbody id="history-body"><tr><td colspan="9" style="text-align:center;color:var(--muted);padding:2rem">Loading...</td></tr></tbody>
+          <tbody id="history-body"><tr><td colspan="9" style="text-align:center;color:var(--color-text-3);padding:2rem">Loading...</td></tr></tbody>
         </table>
       </div>
     </section>
@@ -239,7 +260,7 @@
         </select>
         <button class="btn btn-ghost btn-sm" onclick="loadTests()">🔄 Refresh</button>
       </div>
-      <div id="tests-list"><div style="text-align:center;padding:3rem;color:var(--muted)">Loading assessments...</div></div>
+      <div id="tests-list"><div style="text-align:center;padding:3rem;color:var(--color-text-3)">Loading assessments...</div></div>
     </section>
 
     <!-- LEADERBOARD -->
@@ -254,7 +275,7 @@
         <button class="btn btn-ghost btn-sm" onclick="downloadLeaderboardExport('csv')">⬇ CSV</button>
         <button class="btn btn-ghost btn-sm" onclick="downloadLeaderboardExport('pdf')">📄 PDF</button>
       </div>
-      <div id="leaderboard-body"><div style="text-align:center;padding:3rem;color:var(--muted)">Select an assessment above to view rankings.</div></div>
+      <div id="leaderboard-body"><div style="text-align:center;padding:3rem;color:var(--color-text-3)">Select an assessment above to view rankings.</div></div>
     </section>
 
     <!-- RESULT DETAIL -->
@@ -274,7 +295,7 @@
         <div class="card">
           <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem">
             <div class="avatar" style="width:52px;height:52px;font-size:1.1rem" id="p-avatar">?</div>
-            <div><div style="font-weight:600;font-size:1rem" id="p-name-show"></div><div style="color:var(--muted);font-size:.85rem" id="p-email-show"></div></div>
+            <div><div style="font-weight:600;font-size:1rem" id="p-name-show"></div><div style="color:var(--color-text-3);font-size:.875rem" id="p-email-show"></div></div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:.875rem">
             <div class="form-group"><label>Full Name</label><input type="text" id="p-name"></div>
@@ -300,7 +321,7 @@
     <div class="proc-title">Analyzing Video</div>
     <div class="proc-step" id="proc-step">Uploading...</div>
     <div class="prog-bar-proc"><div class="prog-fill-proc" id="proc-prog" style="width:0%"></div></div>
-    <div style="color:var(--muted);font-size:.75rem">AI pose detection in progress</div>
+    <div style="color:var(--color-text-3);font-size:.8125rem">AI pose detection in progress</div>
   </div>
 </div>
 
@@ -509,7 +530,7 @@ function demoFallback(method, path, body) {
   if (path.includes('/result')) return mkDetail();
   if (path.includes('/results/')) return mkDetail();
   if (path==='/auth/me') return user;
-  if (path==='/profile') return {success:true};
+  if (path==='/profile' || path==='/auth/profile') return {success:true};
   if (path==='/tests') return mkDemoTests();
   if (path.includes('/register') && method==='POST') return {success:true};
   if (path.includes('/register') && method==='DELETE') return {success:true};
@@ -614,6 +635,7 @@ function showSec(s) {
   else if(s==='history') loadHistory();
   else if(s==='profile') loadProfile();
   else if(s==='tests') loadTests();
+  else if(s==='upload') loadUploadTests();
   else if(s==='leaderboard') { populateTestSelect(); loadLeaderboard(); }
 }
 
@@ -1463,7 +1485,7 @@ async function loadProfile() {
 }
 async function saveProfile() {
   try {
-    await api('PUT','/profile',{
+    await api('PUT','/auth/profile',{
       name:document.getElementById('p-name').value||null,
       age:parseInt(document.getElementById('p-age').value)||null,
       height_cm:parseFloat(document.getElementById('p-height').value)||null,
@@ -1552,7 +1574,98 @@ function joinTest(testId, exerciseType) {
   const target = document.querySelector(`[data-ex="${exerciseType}"]`);
   if (target) { target.classList.add('selected'); selectedEx = exerciseType; }
   document.getElementById('submit-btn').dataset.testId = testId;
+  // Sync the upload section dropdown
+  const sel = document.getElementById('upload-test-select');
+  if (sel) {
+    sel.value = testId;
+    if (!sel.value) {
+      // Option not loaded yet — store and apply after load
+      sel.dataset.pendingTestId = testId;
+    }
+    onUploadTestChange();
+  }
   toast(`Recording for assessment — exercise: ${fmtEx(exerciseType)}`,'ok');
+}
+
+// ── Upload section test selector ────────────────────────────────────────────
+async function loadUploadTests() {
+  const sel = document.getElementById('upload-test-select');
+  const loading = document.getElementById('upload-test-loading');
+  loading.style.display = 'block';
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— Free Practice (no assessment) —</option>';
+  try {
+    const tests = await api('GET', '/tests');
+    (tests || []).forEach(t => {
+      if (t.status === 'completed') return;
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      const exNames = (t.exercises || []).map(e => fmtEx(e.type || e)).join(', ');
+      opt.textContent = `${t.name} — ${t.sport || 'General'} · ${exNames} [${t.status}]`;
+      opt.dataset.exercises = JSON.stringify(t.exercises || []);
+      opt.dataset.name = t.name;
+      opt.dataset.sport = t.sport || '';
+      opt.dataset.status = t.status;
+      opt.dataset.date = t.scheduled_date || '';
+      sel.appendChild(opt);
+    });
+    // Restore selection or apply pending
+    const pending = sel.dataset.pendingTestId;
+    if (pending) { sel.value = pending; delete sel.dataset.pendingTestId; }
+    else if (prev) sel.value = prev;
+    onUploadTestChange();
+  } catch(e) { console.error(e); }
+  loading.style.display = 'none';
+}
+
+function onUploadTestChange() {
+  const sel = document.getElementById('upload-test-select');
+  const info = document.getElementById('upload-test-info');
+  const testId = sel.value;
+  const submitBtn = document.getElementById('submit-btn');
+
+  if (!testId) {
+    // Free practice — unlock all exercises
+    info.style.display = 'none';
+    delete submitBtn.dataset.testId;
+    document.querySelectorAll('.ex-btn').forEach(b => {
+      b.style.opacity = '1'; b.style.pointerEvents = 'auto';
+    });
+    return;
+  }
+
+  const opt = sel.options[sel.selectedIndex];
+  const exercises = JSON.parse(opt.dataset.exercises || '[]');
+  const exTypes = exercises.map(e => (e.type || e).toLowerCase());
+  const exNames = exTypes.map(fmtEx).join(', ');
+  const status = opt.dataset.status || 'upcoming';
+
+  // Update info panel
+  document.getElementById('upload-test-name').textContent = opt.dataset.name || '';
+  document.getElementById('upload-test-meta').textContent = opt.dataset.date ? `· ${opt.dataset.date}` : '';
+  document.getElementById('upload-test-exercises').textContent = exNames || '—';
+  const badge = document.getElementById('upload-test-status-badge');
+  badge.textContent = status;
+  badge.className = 'badge ' + ({active:'badge-green',upcoming:'badge-amber',completed:'badge-purple'}[status]||'badge-cyan');
+  info.style.display = 'block';
+
+  // Store testId for submission
+  submitBtn.dataset.testId = testId;
+
+  // Lock exercise grid to test's exercises (or first if multiple)
+  document.querySelectorAll('.ex-btn').forEach(b => {
+    const ex = b.dataset.ex;
+    const allowed = exTypes.length === 0 || exTypes.includes(ex);
+    b.style.opacity = allowed ? '1' : '0.3';
+    b.style.pointerEvents = allowed ? 'auto' : 'none';
+    if (allowed) b.classList.remove('selected');
+  });
+
+  // Auto-select first exercise of the test
+  if (exTypes.length > 0) {
+    const firstBtn = document.querySelector(`[data-ex="${exTypes[0]}"]`);
+    if (firstBtn) { firstBtn.classList.add('selected'); selectedEx = exTypes[0]; }
+  }
 }
 
 // ── Leaderboard ─────────────────────────────────────────────────────────────

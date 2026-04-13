@@ -1,8 +1,11 @@
 """Test management routes."""
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi.responses import StreamingResponse
 from datetime import datetime
 from uuid import uuid4
 from typing import Optional
+import csv
+import io
 
 from database import get_db
 from dependencies import get_current_user, require_authority
@@ -93,7 +96,22 @@ async def list_tests(
             "status": computed_status,
             "scheduled_date": doc.get("scheduled_date"),
             "start_time": doc.get("start_time"),
+            "duration_minutes": doc.get("duration_minutes"),
+            "description": doc.get("description"),
+            "exercises": doc.get("exercises", []),
+            "created_by_name": doc.get("created_by_name", ""),
+            "max_participants": doc.get("max_participants"),
         }
+
+        # Participant count and registration status for athletes
+        reg_count = await db.test_registrations.count_documents({"test_id": str(doc["_id"])})
+        s["participant_count"] = reg_count
+        if user.get("role") == "athlete":
+            reg = await db.test_registrations.find_one({"test_id": str(doc["_id"]), "user_id": user["user_id"]})
+            s["is_registered"] = reg is not None
+        else:
+            s["is_registered"] = False
+
         result.append(s)
 
     return result
@@ -283,6 +301,87 @@ async def test_leaderboard(test_id: str, user=Depends(get_current_user)):
         e["rank"] = i + 1
 
     return entries
+
+
+@router.get("/tests/{test_id}/leaderboard/export")
+async def export_leaderboard(
+    test_id: str,
+    format: str = Query("csv", pattern="^(csv|pdf)$"),
+    user=Depends(get_current_user),
+):
+    """Export leaderboard as CSV or plain text."""
+    db = get_db()
+    test = await db.tests.find_one({"_id": test_id})
+    if not test:
+        raise HTTPException(404, "Test not found")
+
+    # Reuse leaderboard logic
+    sessions = await db.test_sessions.find({"test_id": test_id, "status": "completed"}).to_list(500)
+    sid_list = [str(s["_id"]) for s in sessions]
+    uid_list = list({s["user_id"] for s in sessions})
+    results = await db.analysis_results.find({"session_id": {"$in": sid_list}}).to_list(500)
+    rmap = {r["session_id"]: r for r in results}
+    umap = {str(u["_id"]): u for u in
+            await db.users.find({"_id": {"$in": uid_list}}, {"name": 1, "email": 1}).to_list(500)}
+
+    exercises = test.get("exercises", [])
+    best: dict = {}
+    for s in sessions:
+        uid = s["user_id"]
+        result = rmap.get(str(s["_id"]))
+        if not result:
+            continue
+        score = compute_test_score(result, exercises)
+        if uid not in best or score > best[uid]["score"]:
+            user_info = umap.get(uid, {})
+            best[uid] = {
+                "rank": 0,
+                "name": user_info.get("name", "Unknown"),
+                "score": score,
+                "total_reps": result.get("total_reps", 0),
+                "avg_correctness_score": result.get("avg_correctness_score", 0),
+                "fitness_level": result.get("fitness_level", ""),
+                "form_grade": result.get("form_grade", ""),
+                "cheat_detected": result.get("cheat_detected", False),
+            }
+
+    entries = sorted(best.values(), key=lambda x: x["score"], reverse=True)
+    for i, e in enumerate(entries):
+        e["rank"] = i + 1
+
+    test_name = test.get("name", test_id)
+
+    if format == "csv":
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["Rank", "Athlete", "Score", "Grade", "Reps", "Form %", "Level", "Cheat"])
+        for e in entries:
+            writer.writerow([
+                e["rank"], e["name"], e["score"], e["form_grade"],
+                e["total_reps"], f"{e['avg_correctness_score']:.1f}",
+                e["fitness_level"], "Yes" if e["cheat_detected"] else "No",
+            ])
+        output.seek(0)
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename=leaderboard_{test_id}.csv"},
+        )
+
+    lines = [f"AthleteAI — Leaderboard: {test_name}", "=" * 40, ""]
+    for e in entries:
+        lines.append(
+            f"#{e['rank']} {e['name']} | Score: {e['score']} | "
+            f"Grade: {e['form_grade']} | Reps: {e['total_reps']} | "
+            f"Level: {e['fitness_level']}"
+        )
+    content = "\n".join(lines)
+    return StreamingResponse(
+        iter([content]),
+        media_type="text/plain",
+        headers={"Content-Disposition": f"attachment; filename=leaderboard_{test_id}.txt"},
+    )
+
 
 
 @router.get("/tests/{test_id}/analytics")
