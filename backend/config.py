@@ -22,6 +22,13 @@ MONGO_TLS_ALLOW_INVALID_CERTS = os.environ.get("MONGO_TLS_ALLOW_INVALID_CERTS", 
 MONGO_TLS_ALLOW_INVALID_HOSTNAMES = os.environ.get("MONGO_TLS_ALLOW_INVALID_HOSTNAMES", "false").lower() == "true"
 MONGO_TLS_INSECURE = os.environ.get("MONGO_TLS_INSECURE", "false").lower() == "true"
 
+# ── Email (SMTP for password reset) ──────────────────────────────────────────
+SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USER = os.environ.get("SMTP_USER", "")
+SMTP_PASS = os.environ.get("SMTP_PASS", "")
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5500")
+
 # ── Video Upload ──────────────────────────────────────────────────────────────
 ALLOWED_VIDEO_TYPES = {"video/mp4", "video/quicktime", "video/webm", "video/x-msvideo"}
 MAX_VIDEO_SIZE = 200 * 1024 * 1024  # 200 MB
