@@ -1,6 +1,5 @@
 """Test utilities and status computation."""
 from datetime import datetime, timedelta
-from config import BENCHMARKS
 
 
 def compute_test_status(test: dict) -> str:
@@ -33,15 +32,13 @@ def compute_test_status(test: dict) -> str:
 
 
 def compute_test_score(result: dict, exercises: list) -> float:
-    """Compute test score from result."""
-    ex_type = result.get("exercise_type", "")
-    bm = BENCHMARKS.get(ex_type, {})
-    adv = bm.get("advanced", 1) or 1
-    raw_val = result.get("jump_height_cm") if ex_type == "vertical_jump" else result.get("total_reps", 0)
-    raw_val = raw_val or 0
-    rep_score = min(100.0, (raw_val / adv) * 100)
-    form = result.get("avg_correctness_score") or 70
-    final = rep_score * (form / 100)
-    if result.get("cheat_detected"):
-        final *= 0.5
-    return round(final, 1)
+    """Compute the leaderboard score on the same 0-100 form scale shown in results."""
+    del exercises  # Kept for the existing call signature used by routes.
+
+    score = result.get("hybrid_form_score", result.get("avg_correctness_score", 0))
+    try:
+        score = float(score or 0)
+    except (TypeError, ValueError):
+        score = 0.0
+
+    return round(max(0.0, min(100.0, score)), 1)

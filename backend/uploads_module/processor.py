@@ -76,13 +76,47 @@ async def process_video_job(jid, sid, vpath, exercise_type, user_id):
         if duration_seconds_val < 0 or duration_seconds_val > 10 * 60 * 60:
             duration_seconds_val = 0.0
 
+        backend_total_reps = int(rd.get("total_reps", 0) or 0)
+        live_total_reps = int(live_pose_input.get("total_reps") or 0)
+        live_valid_reps = int(live_pose_input.get("valid_reps") or 0)
+        live_form_accuracy = live_pose_input.get("form_accuracy")
+        detailed_quality_flags = detailed_feedback.get("quality_flags", []) if isinstance(detailed_feedback, dict) else []
+
+        final_total_reps = backend_total_reps
+        rep_count_source = "backend_video"
+        rep_count_delta = backend_total_reps - live_total_reps
+        live_backend_tolerance = max(1, round(max(live_total_reps, backend_total_reps) * 0.12))
+
+        live_reliable_reps = live_valid_reps if live_valid_reps > 0 else 0
+
+        if live_total_reps > 0:
+            backend_capture_weak = (
+                backend_total_reps == 0
+                or rd.get("confidence_score", 0) < 35
+                or "invalid_assessment_capture" in detailed_quality_flags
+                or "insufficient_usable_frames" in detailed_quality_flags
+            )
+            if backend_capture_weak and live_reliable_reps > 0:
+                final_total_reps = live_reliable_reps
+                rep_count_source = "live_valid_pose_fallback"
+            elif live_reliable_reps > 0 and abs(backend_total_reps - live_reliable_reps) <= live_backend_tolerance:
+                final_total_reps = round((backend_total_reps + live_reliable_reps) / 2)
+                rep_count_source = "backend_live_consensus"
+
+        if final_total_reps != backend_total_reps:
+            rd["total_reps"] = final_total_reps
+            rd.setdefault("summary", {})["total_reps"] = final_total_reps
+            duration_for_rate = duration_seconds_val or rd.get("duration", 0) or 0
+            rd["summary"]["reps_per_minute"] = round(final_total_reps / (duration_for_rate / 60), 1) if duration_for_rate else 0
+            pm = VideoProcessor._performance_metrics(exercise_type, final_total_reps, current_form, rd.get("jump_height_cm"))
+
         # Insert analysis result
         await db.analysis_results.insert_one({
             "_id": rid,
             "session_id": sid,
             "user_id": user_id,
             "exercise_type": exercise_type,
-            "total_reps": rd.get("total_reps", 0),
+            "total_reps": final_total_reps,
             "avg_correctness_score": current_form,
             "jump_height_cm": rd.get("jump_height_cm"),
             "duration_seconds": round(duration_seconds_val, 1),
@@ -116,17 +150,22 @@ async def process_video_job(jid, sid, vpath, exercise_type, user_id):
             },
             "performance_metrics": pm,
             "live_pose_input": {
-                "total_reps": int(live_pose_input.get("total_reps") or 0),
-                "valid_reps": int(live_pose_input.get("valid_reps") or 0),
-                "form_accuracy": live_pose_input.get("form_accuracy"),
+                "total_reps": live_total_reps,
+                "valid_reps": live_valid_reps,
+                "form_accuracy": live_form_accuracy,
                 "feedback": live_pose_input.get("feedback", ""),
             },
             "live_vs_backend": {
-                "rep_delta": int(rd.get("total_reps", 0) or 0) - int(live_pose_input.get("total_reps") or 0),
-                "valid_rep_delta": int(rd.get("total_reps", 0) or 0) - int(live_pose_input.get("valid_reps") or 0),
+                "backend_total_reps": backend_total_reps,
+                "final_total_reps": final_total_reps,
+                "rep_count_source": rep_count_source,
+                "rep_delta": backend_total_reps - live_total_reps,
+                "valid_rep_delta": final_total_reps - live_valid_reps,
+                "live_raw_total_reps": live_total_reps,
+                "live_strict_valid_reps": live_valid_reps,
                 "form_delta": (
-                    round(float(current_form) - float(live_pose_input.get("form_accuracy")), 1)
-                    if live_pose_input.get("form_accuracy") is not None else None
+                    round(float(current_form) - float(live_form_accuracy), 1)
+                    if live_form_accuracy is not None else None
                 ),
             },
             "created_at": datetime.utcnow(),

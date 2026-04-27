@@ -1,0 +1,21 @@
+vid_id,dataset_class,exercise,actual_total_reps,actual_valid_reps,notes
+0,jumping_jack,jumping_jack,8,7,manual label
+1,jumping_jack,jumping_jack,3,2,manual label
+2,jumping_jack,jumping_jack,4,3,manual label
+3,jumping_jack,jumping_jack,8,2,manual label
+4,jumping_jack,jumping_jack,10,3,manual label
+208,push_up,pushup,5,0,manual label
+209,push_up,pushup,4,2,manual label
+210,push_up,pushup,4,0,manual label
+211,push_up,pushup,4,2,manual label
+212,push_up,pushup,3,2,manual label
+307,situp,situp,4,2,manual label
+308,situp,situp,5,5,manual label
+309,situp,situp,4,0,manual label
+310,situp,situp,5,0,manual label
+311,situp,situp,3,0,manual label
+385,squat,squat,3,2,manual label
+386,squat,squat,4,2,manual label
+387,squat,squat,4,0,manual label
+388,squat,squat,3,1,manual label
+389,squat,squat,2,1,manual label

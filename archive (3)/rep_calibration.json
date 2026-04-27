@@ -1,0 +1,54 @@
+{
+  "type": "linear_rep_count_calibration",
+  "source": "archive (3)\\validation_rep_labels.csv",
+  "exercises": {
+    "jumping_jack": {
+      "total": {
+        "slope": 0.568966,
+        "intercept": 3.982759,
+        "samples": 5
+      },
+      "valid": {
+        "slope": -0.923077,
+        "intercept": 6.538462,
+        "samples": 5
+      }
+    },
+    "pushup": {
+      "total": {
+        "slope": 0.384615,
+        "intercept": 2.692308,
+        "samples": 5
+      },
+      "valid": {
+        "slope": -0.076923,
+        "intercept": 1.461538,
+        "samples": 5
+      }
+    },
+    "situp": {
+      "total": {
+        "slope": 0.8125,
+        "intercept": 1.4375,
+        "samples": 5
+      },
+      "valid": {
+        "slope": 1.166667,
+        "intercept": -2.333333,
+        "samples": 5
+      }
+    },
+    "squat": {
+      "total": {
+        "slope": -1.333333,
+        "intercept": 6.666667,
+        "samples": 5
+      },
+      "valid": {
+        "slope": 0.333333,
+        "intercept": 0.333333,
+        "samples": 5
+      }
+    }
+  }
+}

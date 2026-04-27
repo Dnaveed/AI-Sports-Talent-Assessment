@@ -397,8 +397,10 @@ window.addEventListener('pageshow', (event) => {
 });
 
 function logout() {
-  localStorage.removeItem('token'); localStorage.removeItem('user');
-  window.top.location.href = 'index.html';
+  localStorage.removeItem('token'); 
+  localStorage.removeItem('user');
+  // Use replace to prevent back button from returning to authenticated page
+  window.top.location.replace('index.html');
 }
 
 // ── API helper ─────────────────────────────────────────────────────────────
@@ -1290,7 +1292,7 @@ async function loadAdminLeaderboard() {
           return `<tr>
             <td><strong style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem">${medal}${e.rank}</strong></td>
             <td><div style="font-weight:600">${e.name}</div><div style="font-size:.72rem;color:var(--muted)">${e.email||''}</div></td>
-            <td><strong style="font-family:'Bebas Neue',sans-serif;font-size:1.25rem;color:var(--purple)">${e.score}</strong><span style="font-size:.7rem;color:var(--muted)">/100</span></td>
+            <td><strong style="font-family:'Bebas Neue',sans-serif;font-size:1.25rem;color:var(--purple)">${fmtScore(e.score)}</strong><span style="font-size:.7rem;color:var(--muted)">/100</span></td>
             <td><span class="badge ${gCol(e.form_grade)}">${e.form_grade||'—'}</span></td>
             <td>${e.total_reps||'—'}</td>
             <td>${sBar(e.avg_correctness_score)}</td>
@@ -1465,6 +1467,7 @@ function closeLeaderboardVideo(evt) {
 function icon(t){return{pushup:'💪',squat:'🏋️',vertical_jump:'🦘',jumping_jack:'⭐',situp:'🤸',lunge:'🚶'}[t]||'🏃';}
 function fmtEx(t){return{pushup:'Push-ups',squat:'Squats',vertical_jump:'Vertical Jump',jumping_jack:'Jumping Jacks',situp:'Sit-ups',lunge:'Lunges'}[t]||t;}
 function fmtDate(d){if(!d)return'—';return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+function fmtScore(s){const n=Number(s);if(!Number.isFinite(n))return'0';return Number.isInteger(n)?String(n):n.toFixed(1);}
 function sBar(s){const c=s>=80?'var(--green)':s>=60?'var(--amber)':'var(--red)';return`<div style="display:flex;align-items:center;gap:.5rem"><div class="prog-bar" style="width:65px"><div class="prog-fill" style="width:${s?.toFixed(0)||0}%;background:${c}"></div></div><span style="font-size:.75rem;color:var(--muted)">${s?.toFixed(0)||0}%</span></div>`;}
 function lCol(l){return{Advanced:'badge-green',Intermediate:'badge-cyan',Beginner:'badge-amber','Needs Work':'badge-red'}[l]||'badge-amber';}
 function gCol(g){return'AB'.includes(g)?'badge-green':g==='C'?'badge-amber':'badge-red';}

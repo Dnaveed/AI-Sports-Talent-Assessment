@@ -91,15 +91,14 @@ nav {
 .layout {
   display: grid;
   grid-template-columns: 240px 1fr;
-  min-height: calc(100vh - 56px);
+  height: calc(100vh - 56px);
+  overflow: hidden;
 }
 .sidebar {
   background: var(--color-surface);
   border-right: 1px solid var(--color-border);
   padding: var(--sp-4) 0;
-  position: sticky;
-  top: 56px;
-  min-height: calc(100vh - 56px);
+  height: 100%;
   overflow-y: auto;
 }
 .sidebar-label {
@@ -131,7 +130,11 @@ nav {
 .sidebar-item:hover { color: var(--color-text-2); background: var(--color-surface-2); }
 .sidebar-item.active { color: var(--color-purple); background: var(--color-purple-s); font-weight: 600; }
 
-.content { padding: var(--sp-6); overflow-y: auto; }
+.content { 
+  padding: var(--sp-6); 
+  overflow-y: auto; 
+  height: 100%;
+}
 .page-title { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; color: var(--color-text); margin-bottom: var(--sp-1); }
 .page-sub { color: var(--color-text-3); font-size: 0.875rem; margin-bottom: var(--sp-6); }
 

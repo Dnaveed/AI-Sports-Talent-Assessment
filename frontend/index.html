@@ -3,19 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AthleteAI — AI-Powered Fitness Evaluation</title>
+<title>AthleteAI - AI Sports Talent Assessment</title>
 <link rel="stylesheet" href="styles/index.css">
 </head>
 <body>
 
-<!-- ── NAVBAR ── -->
 <nav class="navbar" id="navbar">
-  <div class="logo">AthleteAI</div>
+  <a class="logo" href="#">AthleteAI</a>
   <div class="nav-links">
-    <a href="#how">How It Works</a>
+    <a href="#project">Project</a>
+    <a href="#workflow">Workflow</a>
     <a href="#features">Features</a>
-    <a href="#exercises">Exercises</a>
-    <a href="#roles">Get Started</a>
+    <a href="#access">Access</a>
   </div>
   <div class="nav-cta">
     <a href="login.html" class="btn-outline">Sign In</a>
@@ -23,285 +22,155 @@
   </div>
 </nav>
 
-<!-- ── HERO ── -->
-<section class="hero">
-  <div class="hero-tag">
-    <span class="tag-dot"></span>
-    AI-Powered · MediaPipe · Real-time Analysis
-  </div>
-
-  <h1 class="hero-title">
-    <span class="line1">Evaluate Your</span>
-    <span class="line2">Fitness With AI</span>
-  </h1>
-
-  <p class="hero-sub">
-    Upload a workout video. Our AI detects your body pose frame-by-frame,
-    counts repetitions, scores your form, and flags authenticity — all in minutes.
-  </p>
-
-  <div class="hero-cta">
-    <a href="register.html" class="cta-primary">🚀 Start Free &nbsp;→</a>
-    <a href="login.html" class="cta-secondary">🔑 Sign In</a>
-  </div>
-
-  <div class="hero-stats">
-    <div class="hero-stat">
-      <div class="hero-stat-num" id="cnt-exercises">6</div>
-      <div class="hero-stat-lbl">Exercises Supported</div>
-    </div>
-    <div class="hero-stat">
-      <div class="hero-stat-num">Real-time</div>
-      <div class="hero-stat-lbl">Pose Detection</div>
-    </div>
-    <div class="hero-stat">
-      <div class="hero-stat-num">AI</div>
-      <div class="hero-stat-lbl">Cheat Detection</div>
-    </div>
-    <div class="hero-stat">
-      <div class="hero-stat-num">2</div>
-      <div class="hero-stat-lbl">Roles: Athlete & Admin</div>
-    </div>
-  </div>
-
-  <div class="scroll-hint">
-    <span>SCROLL</span>
-    <div class="scroll-line"></div>
-  </div>
-</section>
-
-<!-- ── TECH STRIP ── -->
-<div class="tech-strip">
-  <div class="tech-item"><span class="tech-icon">🤖</span><span class="tech-name">MediaPipe</span></div>
-  <div class="tech-item"><span class="tech-icon">⚡</span><span class="tech-name">FastAPI</span></div>
-  <div class="tech-item"><span class="tech-icon">🍃</span><span class="tech-name">MongoDB</span></div>
-  <div class="tech-item"><span class="tech-icon">🐍</span><span class="tech-name">Python</span></div>
-  <div class="tech-item"><span class="tech-icon">👁️</span><span class="tech-name">OpenCV</span></div>
-  <div class="tech-item"><span class="tech-icon">🌐</span><span class="tech-name">HTML / CSS / JS</span></div>
-</div>
-
-<!-- ── HOW IT WORKS ── -->
-<section id="how">
-  <div class="reveal">
-    <div class="section-tag">Process</div>
-    <h2 class="section-title">HOW IT WORKS</h2>
-    <p class="section-sub">From video upload to detailed analysis in just a few steps. No equipment needed — just a camera.</p>
-  </div>
-  <div class="how-grid">
-    <div class="how-card reveal">
-      <div class="step-num">01</div>
-      <div class="how-icon">📹</div>
-      <div class="how-title">Upload Your Video</div>
-      <p class="how-desc">Record yourself doing any supported exercise and upload the MP4, MOV or WebM file. 10 to 120 seconds is ideal.</p>
-    </div>
-    <div class="how-card reveal" style="transition-delay:.1s">
-      <div class="step-num">02</div>
-      <div class="how-icon">🤖</div>
-      <div class="how-title">AI Pose Detection</div>
-      <p class="how-desc">MediaPipe's landmark model detects 33 body keypoints on every frame, tracking your joints in real time.</p>
-    </div>
-    <div class="how-card reveal" style="transition-delay:.2s">
-      <div class="step-num">03</div>
-      <div class="how-icon">📊</div>
-      <div class="how-title">Form Analysis</div>
-      <p class="how-desc">Reps are counted, joint angles are evaluated, range of motion is scored, and your fitness level is benchmarked.</p>
-    </div>
-    <div class="how-card reveal" style="transition-delay:.3s">
-      <div class="step-num">04</div>
-      <div class="how-icon">📈</div>
-      <div class="how-title">Track Progress</div>
-      <p class="how-desc">See your results, compare against previous tests, and monitor your improvement with charts and performance percentiles.</p>
-    </div>
-  </div>
-</section>
-
-<!-- ── FEATURES ── -->
-<section id="features">
-  <div class="reveal">
-    <div class="section-tag">Capabilities</div>
-    <h2 class="section-title">WHAT IT DOES</h2>
-    <p class="section-sub">A complete fitness evaluation engine, powered by computer vision and AI.</p>
-  </div>
-  <div class="features-grid" style="margin-top:4rem">
-    <div class="feat-card reveal">
-      <div class="feat-icon-box">🦴</div>
-      <div>
-        <div class="feat-title">33-Point Pose Tracking</div>
-        <p class="feat-desc">MediaPipe detects every major joint — shoulders, elbows, hips, knees, ankles — and tracks them across every frame of your video.</p>
+<main>
+  <section class="hero">
+    <div class="hero-copy">
+      <div class="eyebrow"><span></span> AI-powered sports assessment</div>
+      <h1>Evaluate athletes from video, faster and more consistently.</h1>
+      <p>
+        AthleteAI is a web platform for sports authorities and athletes. It uses pose analysis to count reps,
+        score form, flag suspicious submissions, and generate leaderboards for structured fitness tests.
+      </p>
+      <div class="hero-actions">
+        <a href="register.html" class="cta-primary">Create Account</a>
+        <a href="login.html" class="cta-secondary">Open Dashboard</a>
       </div>
     </div>
-    <div class="feat-card reveal" style="transition-delay:.05s">
-      <div class="feat-icon-box purple">🔢</div>
-      <div>
-        <div class="feat-title">Automatic Rep Counting</div>
-        <p class="feat-desc">Joint angles are analysed to detect the full up-down cycle of each exercise type. No manual input needed.</p>
+
+    <div class="live-panel" aria-label="Live product preview">
+      <div class="panel-head">
+        <div>
+          <span class="panel-label">Assessment live</span>
+          <h2>Football Fitness Trial</h2>
+        </div>
+        <span class="status-pill">Clean</span>
+      </div>
+      <div class="score-block">
+        <div>
+          <strong>96</strong><span>/100</span>
+          <p>Form score</p>
+        </div>
+        <div class="score-ring" aria-hidden="true"></div>
+      </div>
+      <div class="metric-list">
+        <div><span>Reps</span><strong>38</strong></div>
+        <div><span>Grade</span><strong>A</strong></div>
+        <div><span>Rank</span><strong>#1</strong></div>
+      </div>
+      <div class="progress-line"><i style="width: 86%"></i></div>
+      <div class="panel-foot">
+        <span>Pose confidence</span>
+        <strong>92%</strong>
       </div>
     </div>
-    <div class="feat-card reveal" style="transition-delay:.1s">
-      <div class="feat-icon-box amber">⭐</div>
-      <div>
-        <div class="feat-title">Form Score (0–100%)</div>
-        <p class="feat-desc">Every rep is graded on correctness. Partial reps, incorrect depth, and compensatory movements all reduce your score.</p>
-      </div>
-    </div>
-    <div class="feat-card reveal" style="transition-delay:.15s">
-      <div class="feat-icon-box green">🛡️</div>
-      <div>
-        <div class="feat-title">Cheat Detection</div>
-        <p class="feat-desc">The AI flags suspicious patterns — hidden face, speed spikes, confidence drops — and marks the test for admin review.</p>
-      </div>
-    </div>
-    <div class="feat-card large reveal" style="transition-delay:.2s">
-      <div class="feat-icon-box" style="background:rgba(0,212,255,0.06);min-width:48px">📊</div>
-      <div>
-        <div class="feat-title">Benchmarks & Percentiles</div>
-        <p class="feat-desc">Your result is compared against beginner, intermediate and advanced benchmarks for that exercise. You get a form grade (A–F), a fitness level, and an estimated percentile — so you always know exactly where you stand.</p>
-      </div>
-    </div>
-  </div>
-</section>
+  </section>
 
-<!-- ── EXERCISES ── -->
-<section id="exercises">
-  <div class="reveal">
-    <div class="section-tag">Supported Movements</div>
-    <h2 class="section-title">6 EXERCISES</h2>
-    <p class="section-sub" style="margin:0 auto">Every exercise has its own AI model tuned for that specific movement pattern.</p>
-  </div>
-  <div class="ex-grid">
-    <div class="ex-card reveal"><span class="ex-emoji">💪</span><div class="ex-label">Push-ups</div><div class="ex-sub">Chest · Triceps</div></div>
-    <div class="ex-card reveal" style="transition-delay:.05s"><span class="ex-emoji">🏋️</span><div class="ex-label">Squats</div><div class="ex-sub">Quads · Glutes</div></div>
-    <div class="ex-card reveal" style="transition-delay:.1s"><span class="ex-emoji">🦘</span><div class="ex-label">Vertical Jump</div><div class="ex-sub">Power · Height</div></div>
-    <div class="ex-card reveal" style="transition-delay:.15s"><span class="ex-emoji">⭐</span><div class="ex-label">Jumping Jacks</div><div class="ex-sub">Cardio · Coord.</div></div>
-    <div class="ex-card reveal" style="transition-delay:.2s"><span class="ex-emoji">🤸</span><div class="ex-label">Sit-ups</div><div class="ex-sub">Core · Abs</div></div>
-    <div class="ex-card reveal" style="transition-delay:.25s"><span class="ex-emoji">🚶</span><div class="ex-label">Lunges</div><div class="ex-sub">Legs · Balance</div></div>
-  </div>
-</section>
+  <section class="stats-band" id="project">
+    <div><strong>6</strong><span>supported exercises</span></div>
+    <div><strong>33</strong><span>pose landmarks</span></div>
+    <div><strong>A-F</strong><span>form grading</span></div>
+    <div><strong>CSV</strong><span>leaderboard export</span></div>
+  </section>
 
-<!-- ── ROLES ── -->
-<section id="roles">
-  <div class="reveal" style="margin-bottom:4rem">
-    <div class="section-tag">Access</div>
-    <h2 class="section-title">TWO ROLES</h2>
-    <p class="section-sub">Choose your role when you sign up. Athletes and Admins get completely separate dashboards.</p>
-  </div>
-  <div class="roles-grid">
-    <div class="role-card athlete reveal">
-      <div class="role-badge athlete"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block"></span> ATHLETE</div>
-      <div class="role-title">For Athletes</div>
-      <p class="role-desc">Upload your workouts and get instant AI-powered analysis, scores, and progress tracking.</p>
-      <ul class="role-perms">
-        <li>Upload workout videos</li>
-        <li>View AI form analysis & scores</li>
-        <li>Track personal progress over time</li>
-        <li>See benchmark comparisons</li>
-        <li>Access full result history</li>
-      </ul>
-      <a href="register.html" class="role-cta athlete">Get Started as Athlete →</a>
+  <section class="section-block">
+    <div class="section-copy">
+      <span class="section-kicker">Project</span>
+      <h2>What the system does</h2>
+      <p>
+        The project helps replace manual fitness-test review with a repeatable AI-assisted workflow.
+        Athletes upload exercise videos, and the backend processes movement quality, repetitions, benchmarks,
+        and authenticity signals.
+      </p>
     </div>
-    <div class="role-card admin reveal" style="transition-delay:.15s">
-      <div class="role-badge admin"><span style="width:6px;height:6px;border-radius:50%;background:currentColor;display:inline-block"></span> ADMIN</div>
-      <div class="role-title">For Admins</div>
-      <p class="role-desc">Manage the platform, view all athletes and results, and review AI-flagged tests.</p>
-      <ul class="role-perms">
-        <li>Platform-wide analytics dashboard</li>
-        <li>Manage all registered athletes</li>
-        <li>View every test result</li>
-        <li>Review AI cheat flags</li>
-        <li>Filter by exercise, level, status</li>
-      </ul>
-      <a href="register.html" class="role-cta admin">Get Started as Admin →</a>
+    <div class="info-grid compact">
+      <article>
+        <span>01</span>
+        <h3>Analyze movement</h3>
+        <p>Detect body landmarks, joint angles, range of motion, and exercise phases.</p>
+      </article>
+      <article>
+        <span>02</span>
+        <h3>Score performance</h3>
+        <p>Calculate reps, form score, grade, fitness level, and useful feedback.</p>
+      </article>
+      <article>
+        <span>03</span>
+        <h3>Compare candidates</h3>
+        <p>Show leaderboards, registered counts, completion counts, flags, and shortlists.</p>
+      </article>
     </div>
-  </div>
-</section>
+  </section>
 
-<!-- ── FINAL CTA ── -->
-<section id="cta">
-  <div class="cta-box reveal">
-    <div class="section-tag" style="justify-content:center">Ready?</div>
-    <h2 class="section-title">START YOUR FIRST TEST</h2>
-    <p class="section-sub">Create an account, upload a video, and get your AI fitness report in minutes.</p>
-    <div class="cta-btns">
-      <a href="register.html" class="cta-primary">🚀 Create Free Account</a>
-      <a href="login.html" class="cta-secondary">🔑 Already have an account</a>
+  <section class="section-block alt" id="workflow">
+    <div class="section-copy">
+      <span class="section-kicker">Workflow</span>
+      <h2>Simple flow for assessment day</h2>
     </div>
-  </div>
-</section>
+    <div class="timeline">
+      <div><strong>Create test</strong><span>Authority schedules exercises and invites athletes.</span></div>
+      <div><strong>Submit video</strong><span>Athlete records and uploads the required movement.</span></div>
+      <div><strong>AI processing</strong><span>Pose analysis produces reps, form score, and flags.</span></div>
+      <div><strong>Review results</strong><span>Authority views rankings, videos, analytics, and exports.</span></div>
+    </div>
+  </section>
 
-<!-- ── FOOTER ── -->
+  <section class="section-block" id="features">
+    <div class="section-copy">
+      <span class="section-kicker">Features</span>
+      <h2>Clear, practical outputs</h2>
+    </div>
+    <div class="feature-list">
+      <div><strong>Rep counting</strong><span>Push-ups, squats, sit-ups, lunges, jumping jacks, and vertical jump.</span></div>
+      <div><strong>Form scoring</strong><span>0-100 score with grade, phase scores, benchmarks, and recommendations.</span></div>
+      <div><strong>Authenticity flags</strong><span>Marks low-confidence or suspicious submissions for review.</span></div>
+      <div><strong>Authority tools</strong><span>Test creation, registered/completed analytics, leaderboards, video review, and exports.</span></div>
+    </div>
+  </section>
+
+  <section class="access" id="access">
+    <div>
+      <span class="section-kicker">Access</span>
+      <h2>Use the dashboard that fits your role.</h2>
+    </div>
+    <div class="access-grid">
+      <article>
+        <h3>Athlete</h3>
+        <p>Register for tests, upload videos, view AI results, and track progress.</p>
+        <a href="register.html">Create athlete account</a>
+      </article>
+      <article>
+        <h3>Sports Authority</h3>
+        <p>Create assessments, manage registrations, review submissions, and shortlist athletes.</p>
+        <a href="register.html">Create authority account</a>
+      </article>
+    </div>
+  </section>
+</main>
+
 <footer>
   <div class="footer-brand">AthleteAI</div>
-  <div class="footer-links">
-    <a href="#how">How It Works</a>
-    <a href="#features">Features</a>
-    <a href="#exercises">Exercises</a>
-    <a href="login.html">Sign In</a>
-    <a href="register.html">Register</a>
-  </div>
-  <div class="footer-copy">Built with MediaPipe · FastAPI · MongoDB</div>
+  <div class="footer-copy">MediaPipe + FastAPI + MongoDB</div>
 </footer>
 
 <script>
-// Navbar scroll effect
 window.addEventListener('scroll', () => {
-  document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 50);
+  document.getElementById('navbar').classList.toggle('scrolled', window.scrollY > 40);
 });
 
-// Reveal on scroll
-const observer = new IntersectionObserver((entries) => {
-  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
-}, { threshold: 0.12 });
-document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
-
-// Counter animation
-function animateCount(el, target) {
-  let start = 0;
-  const step = () => {
-    start += Math.ceil((target - start) / 8);
-    el.textContent = start;
-    if (start < target) requestAnimationFrame(step);
-    else el.textContent = target;
-  };
-  requestAnimationFrame(step);
-}
-const cntObs = new IntersectionObserver((entries) => {
-  entries.forEach(e => {
-    if (e.isIntersecting) {
-      animateCount(document.getElementById('cnt-exercises'), 6);
-      cntObs.disconnect();
-    }
-  });
-});
-cntObs.observe(document.getElementById('cnt-exercises'));
-
-// If already logged in, redirect away from public landing
 function redirectIfLoggedInFromIndex() {
   try {
     const token = localStorage.getItem('token');
     const user = JSON.parse(localStorage.getItem('user') || 'null');
-    if (token && user && user.role) {
-      // Use replace so Back doesn't return here while logged in
-      if (user.role === 'admin') {
-        window.location.replace('admin.html');
-      } else if (user.role === 'authority') {
-        window.location.replace('authority.html');
-      } else {
-        window.location.replace('athlete.html');
-      }
-    }
-  } catch (_) {
-    // Ignore malformed storage
-  }
+    if (!token || !user || !user.role) return;
+    if (user.role === 'admin') window.location.replace('admin.html');
+    else if (user.role === 'authority') window.location.replace('authority.html');
+    else window.location.replace('athlete.html');
+  } catch (_) {}
 }
 
-// Run on normal load
 window.addEventListener('load', redirectIfLoggedInFromIndex);
-
-// Also run when page is restored from back/forward cache
-window.addEventListener('pageshow', (event) => {
-  if (event.persisted) {
-    redirectIfLoggedInFromIndex();
-  }
+window.addEventListener('pageshow', event => {
+  if (event.persisted) redirectIfLoggedInFromIndex();
 });
 </script>
 </body>

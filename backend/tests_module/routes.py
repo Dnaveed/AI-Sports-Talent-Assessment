@@ -27,6 +27,32 @@ async def resolve_target_users(target_emails: Optional[list[str]]) -> list[str]:
     return [str(u["_id"]) for u in users]
 
 
+async def get_test_participant_user_ids(db, test_id: str) -> set[str]:
+    """Return athletes registered for a test, including older completed sessions."""
+    registrations = await db.test_registrations.find(
+        {"test_id": test_id},
+        {"user_id": 1},
+    ).to_list(1000)
+    sessions = await db.test_sessions.find(
+        {"test_id": test_id, "status": "completed"},
+        {"user_id": 1},
+    ).to_list(1000)
+    return {
+        item.get("user_id")
+        for item in [*registrations, *sessions]
+        if item.get("user_id")
+    }
+
+
+async def get_completed_test_user_ids(db, test_id: str) -> set[str]:
+    """Return unique athletes with completed sessions for a test."""
+    sessions = await db.test_sessions.find(
+        {"test_id": test_id, "status": "completed"},
+        {"user_id": 1},
+    ).to_list(1000)
+    return {s.get("user_id") for s in sessions if s.get("user_id")}
+
+
 @router.post("/tests")
 async def create_test(req: CreateTestRequest, user=Depends(require_authority)):
     """Create a new test/assessment."""
@@ -103,12 +129,11 @@ async def list_tests(
             "max_participants": doc.get("max_participants"),
         }
 
-        # Participant count and registration status for athletes
-        reg_count = await db.test_registrations.count_documents({"test_id": str(doc["_id"])})
-        s["participant_count"] = reg_count
+        test_id = str(doc["_id"])
+        participant_ids = await get_test_participant_user_ids(db, test_id)
+        s["participant_count"] = len(participant_ids)
         if user.get("role") == "athlete":
-            reg = await db.test_registrations.find_one({"test_id": str(doc["_id"]), "user_id": user["user_id"]})
-            s["is_registered"] = reg is not None
+            s["is_registered"] = user["user_id"] in participant_ids
         else:
             s["is_registered"] = False
 
@@ -137,9 +162,9 @@ async def get_test(test_id: str, user=Depends(get_current_user)):
     s["status"] = compute_test_status(doc)
     s["is_archived"] = bool(doc.get("is_archived", False))
     
-    reg = await db.test_registrations.find_one({"test_id": test_id, "user_id": user["user_id"]})
-    s["is_registered"] = reg is not None
-    s["participant_count"] = await db.test_registrations.count_documents({"test_id": test_id})
+    participant_ids = await get_test_participant_user_ids(db, test_id)
+    s["is_registered"] = user["user_id"] in participant_ids
+    s["participant_count"] = len(participant_ids)
     s["target_count"] = len(doc.get("target_user_ids", [])) if isinstance(doc.get("target_user_ids"), list) else 0
 
     return s
@@ -240,18 +265,25 @@ async def test_participants(test_id: str, user=Depends(require_authority)):
     """Get test participants."""
     db = get_db()
     regs = await db.test_registrations.find({"test_id": test_id}).to_list(500)
-    uid_list = [r["user_id"] for r in regs]
+    completed_ids = await get_completed_test_user_ids(db, test_id)
+    reg_map = {r["user_id"]: r for r in regs if r.get("user_id")}
+    uid_list = list(set(reg_map.keys()) | completed_ids)
     umap = {str(u["_id"]): u for u in
             await db.users.find({"_id": {"$in": uid_list}}, {"password_hash": 0}).to_list(500)}
 
     return [
         {
-            "user_id": r["user_id"],
-            "registered_at": r["registered_at"].isoformat() if isinstance(r.get("registered_at"), datetime) else "",
-            "name": umap.get(r["user_id"], {}).get("name", "Unknown"),
-            "email": umap.get(r["user_id"], {}).get("email", ""),
+            "user_id": uid,
+            "registered_at": (
+                reg_map[uid]["registered_at"].isoformat()
+                if uid in reg_map and isinstance(reg_map[uid].get("registered_at"), datetime)
+                else ""
+            ),
+            "name": umap.get(uid, {}).get("name", "Unknown"),
+            "email": umap.get(uid, {}).get("email", ""),
+            "completed": uid in completed_ids,
         }
-        for r in regs
+        for uid in uid_list
     ]
 
 
@@ -392,11 +424,11 @@ async def test_analytics(test_id: str, user=Depends(require_authority)):
     if not test:
         raise HTTPException(404, "Test not found")
 
-    registrations = await db.test_registrations.find({"test_id": test_id}).to_list(500)
-    total_registered = len(registrations)
-
     sessions = await db.test_sessions.find({"test_id": test_id, "status": "completed"}).to_list(500)
-    total_completed = len(sessions)
+    registered_user_ids = await get_test_participant_user_ids(db, test_id)
+    completed_user_ids = {s.get("user_id") for s in sessions if s.get("user_id")}
+    total_registered = len(registered_user_ids)
+    total_completed = len(completed_user_ids)
     completion_rate = (total_completed / total_registered * 100) if total_registered > 0 else 0
 
     sid_list = [str(s["_id"]) for s in sessions]
@@ -410,10 +442,11 @@ async def test_analytics(test_id: str, user=Depends(require_authority)):
     exercises = test.get("exercises", [])
     ex_performance = {}
     for ex in exercises:
-        ex_results = [r for r in results if r.get("exercise_type") == ex]
+        ex_type = ex.get("type") if isinstance(ex, dict) else ex
+        ex_results = [r for r in results if r.get("exercise_type") == ex_type]
         if ex_results:
             ex_scores = [r.get("avg_correctness_score", 0) for r in ex_results]
-            ex_performance[ex] = round(sum(ex_scores) / len(ex_scores), 1)
+            ex_performance[ex_type] = round(sum(ex_scores) / len(ex_scores), 1)
 
     top_performers = sorted(
         [

@@ -375,8 +375,59 @@ let liveStats = {
   validReps: 0,
   formAccuracy: 0,
   feedback: 'Enable camera to start AI feedback.',
-  state: { phase: 'up', minAngle: 180, maxAngle: 0, baselineAnkleY: null },
+  state: {},
 };
+
+const LIVE_EXERCISE_RULES = {
+  pushup: {
+    type: 'angle',
+    triples: [['left_shoulder', 'left_elbow', 'left_wrist'], ['right_shoulder', 'right_elbow', 'right_wrist']],
+    down: 95,
+    up: 160,
+    adaptive: true,
+    minRom: 42,
+    validRom: 0.75,
+    minValidVisibility: 0.45,
+    maxBodyLineError: 0.07,
+    feedback: 'Keep elbows tracking back and reach full lockout.',
+  },
+  squat: {
+    type: 'angle',
+    triples: [['left_hip', 'left_knee', 'left_ankle'], ['right_hip', 'right_knee', 'right_ankle']],
+    down: 100,
+    up: 160,
+    adaptive: true,
+    minRom: 38,
+    validRom: 0.75,
+    minValidVisibility: 0.45,
+    feedback: 'Go lower and drive up strongly each rep.',
+  },
+  situp: {
+    type: 'angle',
+    triples: [['left_shoulder', 'left_hip', 'left_knee'], ['right_shoulder', 'right_hip', 'right_knee']],
+    down: 105,
+    up: 155,
+    adaptive: true,
+    minRom: 28,
+    validRom: 0.72,
+    minValidVisibility: 0.42,
+    feedback: 'Curl up fully, then return with control.',
+  },
+  lunge: {
+    type: 'angle',
+    triples: [['left_hip', 'left_knee', 'left_ankle'], ['right_hip', 'right_knee', 'right_ankle']],
+    down: 96,
+    up: 156,
+    adaptive: true,
+    minRom: 35,
+    validRom: 0.72,
+    minValidVisibility: 0.45,
+    feedback: 'Drop knee deeper and keep torso upright.',
+  },
+};
+
+const LIVE_VISIBILITY_MIN = 0.28;
+const LIVE_VALID_QUALITY_MIN = 0.82;
 
 // Guard — redirect if not logged in or wrong role
 if (!token || !user) { window.location.href = 'login.html'; }
@@ -388,8 +439,10 @@ else {
 }
 
 function logout() {
-  localStorage.removeItem('token'); localStorage.removeItem('user');
-  window.location.href = 'login.html';
+  localStorage.removeItem('token'); 
+  localStorage.removeItem('user');
+  // Use replace to prevent back button from returning to authenticated page
+  window.location.replace('login.html');
 }
 
 async function downloadExport(path, filename) {
@@ -778,7 +831,32 @@ function resetLiveStats() {
     validReps: 0,
     formAccuracy: 0,
     feedback: 'Tracking will begin when pose is visible.',
-    state: { phase: 'up', minAngle: 180, maxAngle: 0, baselineAnkleY: null },
+    state: {
+      phase: ['jumping_jack'].includes(selectedEx) ? 'closed' : selectedEx === 'vertical_jump' ? 'ground' : 'up',
+      minAngle: 180,
+      maxAngle: 0,
+      lastRepAt: 0,
+      lowFrames: 0,
+      highFrames: 0,
+      angleHistory: [],
+      adaptiveReady: false,
+      adaptiveDown: null,
+      adaptiveUp: null,
+      movementLow: null,
+      movementHigh: null,
+      movementMid: null,
+      direction: null,
+      lastAngle: null,
+      pendingBottom: false,
+      framesSeen: 0,
+      baselineHipY: null,
+      minHipY: null,
+      athleteHeight: null,
+      openSeen: false,
+      currentOpen: null,
+      repFeedback: '',
+      repFeedbackUntil: 0,
+    },
   };
   updateLivePanel();
 }
@@ -795,13 +873,77 @@ function meanAngle(landmarks, triples) {
     const p1 = landmarkPoint(landmarks, KP[a]);
     const p2 = landmarkPoint(landmarks, KP[b]);
     const p3 = landmarkPoint(landmarks, KP[c]);
-    if (p1 && p2 && p3 && p1.vis > 0.45 && p2.vis > 0.45 && p3.vis > 0.45) {
+    if (p1 && p2 && p3 && p1.vis > LIVE_VISIBILITY_MIN && p2.vis > LIVE_VISIBILITY_MIN && p3.vis > LIVE_VISIBILITY_MIN) {
       const ang = angle3(p1, p2, p3);
       if (Number.isFinite(ang)) vals.push(ang);
     }
   }
   if (!vals.length) return null;
   return vals.reduce((s, v) => s + v, 0) / vals.length;
+}
+
+function meanVisibility(landmarks, names) {
+  const vals = names.map(name => landmarkPoint(landmarks, KP[name])?.vis ?? 0);
+  return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : 0;
+}
+
+function midpoint(a, b) {
+  if (!a || !b) return null;
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, vis: Math.min(a.vis ?? 1, b.vis ?? 1) };
+}
+
+function bodyLineError(landmarks) {
+  const ms = midpoint(landmarkPoint(landmarks, KP.left_shoulder), landmarkPoint(landmarks, KP.right_shoulder));
+  const mh = midpoint(landmarkPoint(landmarks, KP.left_hip), landmarkPoint(landmarks, KP.right_hip));
+  const mk = midpoint(landmarkPoint(landmarks, KP.left_knee), landmarkPoint(landmarks, KP.right_knee));
+  if (!ms || !mh || !mk) return null;
+  return Math.abs(mh.y - ((ms.y + mk.y) / 2));
+}
+
+function percentile(values, p) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const idx = Math.max(0, Math.min(sorted.length - 1, Math.floor((p / 100) * (sorted.length - 1))));
+  return sorted[idx];
+}
+
+function formatRepFeedback(valid, faults) {
+  if (valid) return 'Valid rep counted. Keep the same range and control.';
+  const labels = {
+    insufficient_depth: 'go deeper',
+    incomplete_lockout: 'finish the top position',
+    limited_range: 'use a larger range of motion',
+    low_visibility: 'keep the full body visible',
+    core_alignment: 'keep your trunk aligned',
+    arm_range: 'raise arms wider',
+    leg_range: 'open legs wider',
+    low_jump: 'jump higher',
+    heavy_landing: 'land under control',
+  };
+  const readable = faults.map(f => labels[f] || f.replaceAll('_', ' ')).slice(0, 2).join(', ');
+  return `Rep counted, but not valid: ${readable || 'improve form'}.`;
+}
+
+function markLiveRep(rep) {
+  const now = performance.now();
+  if (now - (liveStats.state.lastRepAt || 0) < 450) return false;
+  const quality = Math.max(0, Math.min(1, rep?.quality ?? rep?.form ?? 0));
+  const romScore = Math.max(0, Math.min(1, rep?.romScore ?? 0));
+  const visibility = Math.max(0, Math.min(1, rep?.visibility ?? 0));
+  const faults = rep?.faults || [];
+  const valid = Boolean(rep?.valid)
+    && quality >= LIVE_VALID_QUALITY_MIN
+    && romScore >= (rep?.validRom ?? 0.75)
+    && visibility >= (rep?.minVisibility ?? 0.45)
+    && faults.length === 0;
+  liveStats.state.lastRepAt = now;
+  liveStats.totalReps += 1;
+  if (valid) liveStats.validReps += 1;
+  liveStats.formAccuracy = liveStats.formAccuracy === 0 ? quality : (liveStats.formAccuracy * 0.7 + quality * 0.3);
+  liveStats.state.repFeedback = formatRepFeedback(valid, faults);
+  liveStats.state.repFeedbackUntil = now + 1800;
+  liveStats.feedback = liveStats.state.repFeedback;
+  return true;
 }
 
 function analyzeJumpingJack(landmarks) {
@@ -817,111 +959,235 @@ function analyzeJumpingJack(landmarks) {
   const shoulderW = Math.max(1e-4, Math.abs(ls.x - rs.x));
   const handSpan = Math.abs(lw.x - rw.x) / shoulderW;
   const footSpan = Math.abs(la.x - ra.x) / shoulderW;
-  const open = handSpan > 2.1 && footSpan > 1.7;
-  const closed = handSpan < 1.3 && footSpan < 1.2;
-  if (liveStats.state.phase === 'closed' && open) liveStats.state.phase = 'open';
-  if (liveStats.state.phase !== 'closed' && closed) {
+  const open = handSpan > 1.85 && footSpan > 1.45;
+  const closed = handSpan < 1.45 && footSpan < 1.25;
+  if (liveStats.state.phase === 'closed' && open) {
+    liveStats.state.phase = 'open';
+    liveStats.state.currentOpen = { handSpan, footSpan };
+  }
+  if (liveStats.state.phase === 'open' && liveStats.state.currentOpen) {
+    liveStats.state.currentOpen.handSpan = Math.max(liveStats.state.currentOpen.handSpan, handSpan);
+    liveStats.state.currentOpen.footSpan = Math.max(liveStats.state.currentOpen.footSpan, footSpan);
+  }
+  if (liveStats.state.phase === 'open' && closed) {
     liveStats.state.phase = 'closed';
-    liveStats.totalReps += 1;
-    const form = Math.min(1, Math.max(0.55, (handSpan / 2.5 + footSpan / 2.1) / 2));
-    if (form >= 0.85) liveStats.validReps += 1;
-    liveStats.formAccuracy = liveStats.formAccuracy === 0 ? form : avg(liveStats.formAccuracy, form);
+    const peak = liveStats.state.currentOpen || { handSpan, footSpan };
+    const armScore = Math.min(1, peak.handSpan / 2.4);
+    const legScore = Math.min(1, peak.footSpan / 1.9);
+    const visibility = meanVisibility(landmarks, ['left_wrist', 'right_wrist', 'left_ankle', 'right_ankle', 'left_shoulder', 'right_shoulder']);
+    const faults = [];
+    if (peak.handSpan < 2.2) faults.push('arm_range');
+    if (peak.footSpan < 1.75) faults.push('leg_range');
+    if (visibility < 0.45) faults.push('low_visibility');
+    markLiveRep({
+      quality: Math.max(0.55, Math.min(1, (armScore + legScore) / 2)),
+      romScore: Math.min(1, (armScore + legScore) / 2),
+      visibility,
+      valid: faults.length === 0,
+      faults,
+      validRom: 0.78,
+      minVisibility: 0.45,
+    });
+    liveStats.state.currentOpen = null;
   }
   const form = Math.min(1, (Math.min(handSpan / 2.3, 1) + Math.min(footSpan / 1.9, 1)) / 2);
   return { form, feedback: open ? 'Great extension. Return to closed stance.' : 'Open arms and legs wider.' };
 }
 
 function analyzeVerticalJump(landmarks) {
+  const lh = landmarkPoint(landmarks, KP.left_hip);
+  const rh = landmarkPoint(landmarks, KP.right_hip);
   const la = landmarkPoint(landmarks, KP.left_ankle);
   const ra = landmarkPoint(landmarks, KP.right_ankle);
+  const ls = landmarkPoint(landmarks, KP.left_shoulder);
+  const rs = landmarkPoint(landmarks, KP.right_shoulder);
   const lk = landmarkPoint(landmarks, KP.left_knee);
   const rk = landmarkPoint(landmarks, KP.right_knee);
-  if (!la || !ra || !lk || !rk) return { form: 0.55, feedback: 'Keep knees and ankles visible.' };
+  if (!lh || !rh || !la || !ra || !lk || !rk) return { form: 0.55, feedback: 'Keep hips, knees, and ankles visible.' };
 
+  const hipY = (lh.y + rh.y) / 2;
   const ankleY = (la.y + ra.y) / 2;
-  const kneeAngle = meanAngle(landmarks, [
-    ['left_hip', 'left_knee', 'left_ankle'],
-    ['right_hip', 'right_knee', 'right_ankle'],
-  ]);
-  if (liveStats.state.baselineAnkleY == null) liveStats.state.baselineAnkleY = ankleY;
-
-  const baseline = liveStats.state.baselineAnkleY;
-  const jumpDelta = baseline - ankleY;
-  if (liveStats.state.phase !== 'air' && jumpDelta > 0.05) {
-    liveStats.state.phase = 'air';
-    liveStats.totalReps += 1;
-    const form = kneeAngle ? Math.min(1, Math.max(0.6, kneeAngle / 165)) : 0.7;
-    if (form >= 0.85) liveStats.validReps += 1;
-    liveStats.formAccuracy = liveStats.formAccuracy === 0 ? form : avg(liveStats.formAccuracy, form);
+  if (liveStats.state.baselineHipY == null) liveStats.state.baselineHipY = hipY;
+  if (liveStats.state.athleteHeight == null && ls && rs) {
+    const shoulderY = (ls.y + rs.y) / 2;
+    liveStats.state.athleteHeight = Math.max(0.2, Math.abs(ankleY - shoulderY) * 1.4);
   }
-  if (liveStats.state.phase === 'air' && jumpDelta < 0.02) liveStats.state.phase = 'ground';
-  liveStats.state.baselineAnkleY = baseline * 0.97 + ankleY * 0.03;
+
+  const baseline = liveStats.state.baselineHipY;
+  const jumpDelta = baseline - hipY;
+  const airborne = ankleY < 0.92 || jumpDelta > 0.05;
+  if (liveStats.state.phase === 'ground' && airborne) {
+    liveStats.state.phase = 'airborne';
+    liveStats.state.minHipY = hipY;
+  } else if (liveStats.state.phase === 'airborne') {
+    liveStats.state.minHipY = Math.min(liveStats.state.minHipY ?? hipY, hipY);
+    if (!airborne) {
+      liveStats.state.phase = 'ground';
+      const heightRatio = (baseline - (liveStats.state.minHipY ?? hipY)) / Math.max(0.2, liveStats.state.athleteHeight || 1);
+      const visibility = meanVisibility(landmarks, ['left_hip', 'right_hip', 'left_ankle', 'right_ankle', 'left_knee', 'right_knee']);
+      const faults = [];
+      if (heightRatio < 0.08) faults.push('low_jump');
+      if (ankleY > 0.96) faults.push('heavy_landing');
+      if (visibility < 0.45) faults.push('low_visibility');
+      markLiveRep({
+        quality: Math.min(1, Math.max(0.6, 0.65 + heightRatio * 2.8)),
+        romScore: Math.min(1, heightRatio / 0.12),
+        visibility,
+        valid: faults.length === 0,
+        faults,
+        validRom: 0.65,
+        minVisibility: 0.45,
+      });
+      liveStats.state.minHipY = null;
+    }
+  } else {
+    liveStats.state.baselineHipY = baseline * 0.985 + hipY * 0.015;
+  }
 
   return { form: Math.min(1, Math.max(0.55, 0.6 + jumpDelta * 5)), feedback: 'Explode upward, then land softly.' };
 }
 
 function analyzeRepByAngle(landmarks, config) {
+  const needed = [...new Set(config.triples.flat())];
+  const visibility = meanVisibility(landmarks, needed);
+  if (visibility < LIVE_VISIBILITY_MIN) {
+    return { form: 0.45, feedback: 'Adjust camera so key joints stay visible.' };
+  }
   const angle = meanAngle(landmarks, config.triples);
   if (angle == null) {
     return { form: 0.5, feedback: 'Adjust camera so key joints stay visible.' };
   }
 
+  const st = liveStats.state;
+  st.framesSeen += 1;
+  const hist = st.angleHistory;
+  hist.push(angle);
+  if (hist.length > 180) hist.shift();
+
+  const low = percentile(hist, 5) ?? angle;
+  const high = percentile(hist, 95) ?? angle;
+  const rom = high - low;
+  if (config.adaptive && rom >= 16) {
+    st.adaptiveDown = low + Math.max(5, 0.25 * rom);
+    st.adaptiveUp = low + Math.max(12, 0.68 * rom);
+    if (st.adaptiveUp <= st.adaptiveDown + 8) st.adaptiveUp = st.adaptiveDown + 8;
+    st.adaptiveReady = true;
+  }
+  const downThr = st.adaptiveDown ?? config.down;
+  const upThr = st.adaptiveUp ?? config.up;
+
+  if (st.movementLow == null || angle < st.movementLow) st.movementLow = angle;
+  if (st.movementHigh == null || angle > st.movementHigh) st.movementHigh = angle;
+  st.movementMid = (st.movementLow + st.movementHigh) / 2;
+
+  if (st.lastAngle != null) {
+    const delta = angle - st.lastAngle;
+    if (Math.abs(delta) > 1.2) {
+      const nextDirection = delta > 0 ? 'up' : 'down';
+      if (st.direction === 'down' && nextDirection === 'up' && rom >= 12) {
+        st.pendingBottom = true;
+      }
+      if (st.direction === 'up' && nextDirection === 'down' && st.pendingBottom && rom >= 12) {
+        const dynamicRom = Math.max(1, st.movementHigh - st.movementLow);
+        const romScore = Math.max(0, Math.min(1, dynamicRom / Math.max(24, config.up - config.down)));
+        const faults = validateAngleRep({
+          landmarks,
+          config,
+          minAngle: st.movementLow,
+          maxAngle: st.movementHigh,
+          romScore,
+          visibility,
+          downThr,
+          upThr,
+        });
+        markLiveRep({
+          quality: Math.max(0.55, Math.min(1, 0.65 + romScore * 0.35 - faults.length * 0.08)),
+          romScore,
+          visibility,
+          valid: faults.length === 0,
+          faults,
+          validRom: config.validRom,
+          minVisibility: config.minValidVisibility,
+        });
+        st.phase = 'up';
+        st.pendingBottom = false;
+        st.movementLow = angle;
+        st.movementHigh = angle;
+      }
+      st.direction = nextDirection;
+    }
+  }
+  st.lastAngle = angle;
+
   liveStats.state.minAngle = Math.min(liveStats.state.minAngle, angle);
   liveStats.state.maxAngle = Math.max(liveStats.state.maxAngle, angle);
-  const st = liveStats.state;
-  if (st.phase === 'up' && angle < config.down + 10) st.phase = 'downward';
-  if (st.phase === 'downward' && angle < config.down) st.phase = 'bottom';
-  if (st.phase === 'bottom' && angle > config.down + 10) st.phase = 'upward';
-
-  if (st.phase === 'upward' && angle > config.up) {
-    st.phase = 'up';
-    liveStats.totalReps += 1;
-    const rom = Math.max(0, Math.min(1, (config.up - st.minAngle) / Math.max(1, config.up - config.down)));
-    const lockout = Math.max(0, Math.min(1, (st.maxAngle - config.up + 8) / 16));
-    const form = Math.max(0.5, Math.min(1, 0.75 * rom + 0.25 * lockout));
-    if (form >= 0.85) liveStats.validReps += 1;
-    liveStats.formAccuracy = liveStats.formAccuracy === 0 ? form : avg(liveStats.formAccuracy, form);
-    st.minAngle = angle;
-    st.maxAngle = angle;
+  if (angle < downThr) {
+    st.lowFrames += 1;
+    st.highFrames = 0;
+  } else if (angle > upThr) {
+    st.highFrames += 1;
+    st.lowFrames = 0;
+  } else {
+    st.lowFrames = Math.max(0, st.lowFrames - 1);
+    st.highFrames = Math.max(0, st.highFrames - 1);
   }
 
-  const curForm = Math.max(0.45, Math.min(1, (config.up - angle + 70) / 120));
-  return { form: curForm, feedback: config.feedback };
+  if (st.phase === 'up' && angle < downThr + 12) st.phase = 'downward';
+  if (st.phase === 'downward' && st.lowFrames >= 2) st.phase = 'bottom';
+  if (st.phase === 'bottom' && angle > downThr + 12) st.phase = 'upward';
+
+  if (st.phase === 'upward' && st.highFrames >= 2) {
+    st.phase = 'up';
+    const romPct = Math.max(0, Math.min(1, (upThr - st.minAngle) / Math.max(1, upThr - downThr)));
+    const lockout = Math.max(0, Math.min(1, (st.maxAngle - upThr + 8) / 16));
+    const faults = validateAngleRep({
+      landmarks,
+      config,
+      minAngle: st.minAngle,
+      maxAngle: st.maxAngle,
+      romScore: romPct,
+      visibility,
+      downThr,
+      upThr,
+    });
+    markLiveRep({
+      quality: Math.max(0.5, Math.min(1, 0.75 * romPct + 0.25 * lockout - faults.length * 0.08)),
+      romScore: romPct,
+      visibility,
+      valid: faults.length === 0,
+      faults,
+      validRom: config.validRom,
+      minVisibility: config.minValidVisibility,
+    });
+    st.minAngle = angle;
+    st.maxAngle = angle;
+    st.pendingBottom = false;
+  }
+
+  const curForm = Math.max(0.45, Math.min(1, (upThr - angle + 70) / 120));
+  const debug = st.framesSeen < 30 ? ' Hold full body in frame while AI calibrates.' : '';
+  return { form: curForm, feedback: `${config.feedback}${debug}` };
+}
+
+function validateAngleRep({ landmarks, config, minAngle, maxAngle, romScore, visibility, downThr, upThr }) {
+  const faults = [];
+  const romDegrees = maxAngle - minAngle;
+  if (visibility < (config.minValidVisibility ?? 0.45)) faults.push('low_visibility');
+  if (romDegrees < (config.minRom ?? 32) || romScore < (config.validRom ?? 0.75)) faults.push('limited_range');
+  if (minAngle > downThr + 10) faults.push('insufficient_depth');
+  if (maxAngle < upThr - 8) faults.push('incomplete_lockout');
+  if (selectedEx === 'pushup') {
+    const lineError = bodyLineError(landmarks);
+    if (lineError != null && lineError > (config.maxBodyLineError ?? 0.07)) faults.push('core_alignment');
+  }
+  return [...new Set(faults)];
 }
 
 function analyzePoseFrame(landmarks) {
   if (selectedEx === 'jumping_jack') return analyzeJumpingJack(landmarks);
   if (selectedEx === 'vertical_jump') return analyzeVerticalJump(landmarks);
-  if (selectedEx === 'pushup') {
-    return analyzeRepByAngle(landmarks, {
-      triples: [['left_shoulder', 'left_elbow', 'left_wrist'], ['right_shoulder', 'right_elbow', 'right_wrist']],
-      down: 95,
-      up: 160,
-      feedback: 'Keep elbows tracking back and reach full lockout.',
-    });
-  }
-  if (selectedEx === 'situp') {
-    return analyzeRepByAngle(landmarks, {
-      triples: [['left_shoulder', 'left_hip', 'left_knee'], ['right_shoulder', 'right_hip', 'right_knee']],
-      down: 120,
-      up: 158,
-      feedback: 'Curl up fully, then return with control.',
-    });
-  }
-  if (selectedEx === 'lunge') {
-    return analyzeRepByAngle(landmarks, {
-      triples: [['left_hip', 'left_knee', 'left_ankle'], ['right_hip', 'right_knee', 'right_ankle']],
-      down: 98,
-      up: 156,
-      feedback: 'Drop knee deeper and keep torso upright.',
-    });
-  }
-  return analyzeRepByAngle(landmarks, {
-    triples: [['left_hip', 'left_knee', 'left_ankle'], ['right_hip', 'right_knee', 'right_ankle']],
-    down: 100,
-    up: 160,
-    feedback: 'Go lower and drive up strongly each rep.',
-  });
+  const rules = LIVE_EXERCISE_RULES[selectedEx] || LIVE_EXERCISE_RULES.squat;
+  return analyzeRepByAngle(landmarks, { ...rules });
 }
 
 function drawPose(landmarks) {
@@ -999,7 +1265,9 @@ async function runDetectorFrame() {
     if (landmarks?.length) {
       setLiveStatus('Tracking', 'badge-green');
       const frame = analyzePoseFrame(landmarks);
-      liveStats.feedback = frame.feedback;
+      if (!liveStats.state.repFeedbackUntil || performance.now() > liveStats.state.repFeedbackUntil) {
+        liveStats.feedback = frame.feedback;
+      }
       const blended = liveStats.formAccuracy === 0 ? frame.form : (liveStats.formAccuracy * 0.85 + frame.form * 0.15);
       liveStats.formAccuracy = Math.max(0, Math.min(1, blended));
       updateLivePanel();
@@ -1637,7 +1905,7 @@ async function loadLeaderboard() {
         return `<tr style="${isMe?'background:rgba(0,212,255,.05);':''}">
           <td><strong style="font-family:'Bebas Neue',sans-serif;font-size:1.1rem">${medal}${e.rank}</strong></td>
           <td><div style="font-weight:600">${e.name}${isMe?' <span class="badge badge-cyan" style="font-size:.58rem">YOU</span>':''}</div></td>
-          <td><strong style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;color:var(--cyan)">${e.score}</strong><span style="font-size:.7rem;color:var(--muted)">/100</span></td>
+          <td><strong style="font-family:'Bebas Neue',sans-serif;font-size:1.2rem;color:var(--cyan)">${fmtScore(e.score)}</strong><span style="font-size:.7rem;color:var(--muted)">/100</span></td>
           <td><span class="badge ${gCol(e.form_grade)}">${e.form_grade||'—'}</span></td>
           <td>${e.total_reps||'—'}</td>
           <td>${sBar(e.avg_correctness_score)}</td>
@@ -1652,6 +1920,7 @@ async function loadLeaderboard() {
 function icon(t){return{pushup:'💪',squat:'🏋️',vertical_jump:'🦘',jumping_jack:'⭐',situp:'🤸',lunge:'🚶'}[t]||'🏃';}
 function fmtEx(t){return{pushup:'Push-ups',squat:'Squats',vertical_jump:'Vertical Jump',jumping_jack:'Jumping Jacks',situp:'Sit-ups',lunge:'Lunges'}[t]||t;}
 function fmtDate(d){if(!d)return'—';return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+function fmtScore(s){const n=Number(s);if(!Number.isFinite(n))return'0';return Number.isInteger(n)?String(n):n.toFixed(1);}
 function sBar(s){const c=s>=80?'var(--green)':s>=60?'var(--amber)':'var(--red)';return`<div style="display:flex;align-items:center;gap:.5rem"><div class="prog-bar" style="width:65px"><div class="prog-fill" style="width:${s?.toFixed(0)||0}%;background:${c}"></div></div><span style="font-size:.75rem;color:var(--muted)">${s?.toFixed(0)||0}%</span></div>`;}
 function ringChart(s){const r=35,c=2*Math.PI*r,f=(s/100)*c,col=s>=80?'#10b981':s>=60?'#f59e0b':'#ef4444';return`<div class="score-ring"><svg width="90" height="90" viewBox="0 0 90 90"><circle cx="45" cy="45" r="${r}" fill="none" stroke="#162034" stroke-width="6"/><circle cx="45" cy="45" r="${r}" fill="none" stroke="${col}" stroke-width="6" stroke-dasharray="${f} ${c}" stroke-linecap="round"/></svg><div class="ring-label">${s?.toFixed(0)}<small>FORM</small></div></div>`;}
 function lCol(l){return{Advanced:'badge-green',Intermediate:'badge-cyan',Beginner:'badge-amber','Needs Work':'badge-red'}[l]||'badge-amber';}

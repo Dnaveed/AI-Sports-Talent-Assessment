@@ -65,6 +65,26 @@ async def upload_video(
 
     db = get_db()
 
+    if test_id:
+        test = await db.tests.find_one({"_id": test_id}, {"_id": 1, "target_user_ids": 1})
+        if not test:
+            raise HTTPException(404, "Test not found")
+        target_users = test.get("target_user_ids") or []
+        if target_users and user["user_id"] not in target_users:
+            raise HTTPException(403, "Not assigned to this test")
+        if user.get("role") == "athlete":
+            await db.test_registrations.update_one(
+                {"test_id": test_id, "user_id": user["user_id"]},
+                {"$setOnInsert": {
+                    "_id": f"{test_id}#{user['user_id']}",
+                    "test_id": test_id,
+                    "user_id": user["user_id"],
+                    "registered_at": now,
+                    "source": "auto_on_submission",
+                }},
+                upsert=True,
+            )
+
     await db.test_sessions.insert_one({
         "_id": sid,
         "user_id": user["user_id"],
