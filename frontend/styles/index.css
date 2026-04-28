@@ -110,14 +110,14 @@ main {
 }
 
 .hero {
-  min-height: 92vh;
+  min-height: 60vh;
   max-width: 1160px;
   margin: 0 auto;
   padding: 118px var(--sp-8) var(--sp-16);
-  display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(340px, 0.75fr);
-  gap: var(--sp-16);
-  align-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
 }
 
 .eyebrow,
@@ -477,12 +477,10 @@ footer {
 
 @media (max-width: 900px) {
   .nav-links { display: none; }
-  .hero,
   .access {
     grid-template-columns: 1fr;
   }
   .hero {
-    gap: var(--sp-10);
     padding-top: 96px;
   }
   .info-grid,

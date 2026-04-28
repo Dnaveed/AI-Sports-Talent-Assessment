@@ -466,6 +466,7 @@ select option { background: var(--color-surface); color: var(--color-text); }
 @media (max-width: 980px) {
   .dashboard-charts { grid-template-columns: 1fr; }
   .dashboard-chart { height: 160px !important; max-height: 160px; }
+  #sec-profile .profile-grid { grid-template-columns: 1fr !important; }
 }
 @media (max-width: 768px) {
   .layout { grid-template-columns: 1fr; }

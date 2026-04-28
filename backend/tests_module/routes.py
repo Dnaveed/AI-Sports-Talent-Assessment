@@ -446,7 +446,11 @@ async def test_analytics(test_id: str, user=Depends(require_authority)):
         ex_results = [r for r in results if r.get("exercise_type") == ex_type]
         if ex_results:
             ex_scores = [r.get("avg_correctness_score", 0) for r in ex_results]
-            ex_performance[ex_type] = round(sum(ex_scores) / len(ex_scores), 1)
+            ex_reps = [r.get("total_reps", 0) for r in ex_results]
+            ex_performance[ex_type] = {
+                "avg_score": round(sum(ex_scores) / len(ex_scores), 1),
+                "avg_reps": round(sum(ex_reps) / len(ex_reps), 1),
+            }
 
     top_performers = sorted(
         [
