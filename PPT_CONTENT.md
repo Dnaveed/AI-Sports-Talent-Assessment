@@ -355,7 +355,7 @@ A comprehensive AI-powered sports talent assessment platform designed to revolut
    - Objective: Provide tailored views for athletes, coaches, admins
    - Metric: Three distinct UI templates with appropriate permissions
    - Implementation: JWT-based RBAC
-
+   
 10. **Accessibility & Ease of Use**
     - Objective: Minimize learning curve; onboard users in < 5 minutes
     - Metric: System usability score > 7/10
@@ -462,7 +462,6 @@ A comprehensive AI-powered sports talent assessment platform designed to revolut
 ---
 
 ## SLIDE 11: UML Diagrams
-
 ### **1. Class Diagram - Core Entities**
 
 ```

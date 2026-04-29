@@ -26,7 +26,7 @@
   <section class="hero">
     <div class="hero-copy">
       <div class="eyebrow"><span></span> AI-powered sports assessment</div>
-      <h1>Evaluate athletes from video, faster and more consistently.</h1>
+      <h1>Scalable AI-driven athlete assessment for modern sports programs</h1>
       <p>
         AthleteAI is a web platform for sports authorities and athletes. It uses pose analysis to count reps,
         score form, flag suspicious submissions, and generate leaderboards for structured fitness tests.
@@ -35,9 +35,38 @@
         <a href="register.html" class="cta-primary">Create Account</a>
         <a href="login.html" class="cta-secondary">Open Dashboard</a>
       </div>
+      <p class="trust-signal">Trusted by 100+ coaches &amp; sports academies</p>
     </div>
 
-
+    <div class="hero-visual" aria-hidden="true">
+      <div class="live-panel">
+        <div class="panel-head">
+          <div>
+            <span class="panel-label">Live analysis</span>
+            <h2>Assessment overview</h2>
+          </div>
+          <span class="status-pill">Processing</span>
+        </div>
+        <div class="score-block">
+          <div>
+            <strong>92</strong>
+            <span>Form score</span>
+            <p>Push-up benchmark</p>
+          </div>
+          <div class="score-ring"></div>
+        </div>
+        <div class="metric-list">
+          <div><span>Reps</span><strong>38</strong></div>
+          <div><span>Grade</span><strong>A</strong></div>
+          <div><span>Flag</span><strong>Clear</strong></div>
+        </div>
+        <div class="progress-line"><i style="width: 82%;"></i></div>
+        <div class="panel-foot">
+          <div><span>Confidence</span><strong>98%</strong></div>
+          <div><span>Leaderboard</span><strong>#04</strong></div>
+        </div>
+      </div>
+    </div>
   </section>
 
   <section class="stats-band" id="project">
@@ -59,17 +88,17 @@
     </div>
     <div class="info-grid compact">
       <article>
-        <span>01</span>
+        <span class="card-icon">01</span>
         <h3>Analyze movement</h3>
         <p>Detect body landmarks, joint angles, range of motion, and exercise phases.</p>
       </article>
       <article>
-        <span>02</span>
+        <span class="card-icon">02</span>
         <h3>Score performance</h3>
         <p>Calculate reps, form score, grade, fitness level, and useful feedback.</p>
       </article>
       <article>
-        <span>03</span>
+        <span class="card-icon">03</span>
         <h3>Compare candidates</h3>
         <p>Show leaderboards, registered counts, completion counts, flags, and shortlists.</p>
       </article>
@@ -82,10 +111,10 @@
       <h2>Simple flow for assessment day</h2>
     </div>
     <div class="timeline">
-      <div><strong>Create test</strong><span>Authority schedules exercises and invites athletes.</span></div>
-      <div><strong>Submit video</strong><span>Athlete records and uploads the required movement.</span></div>
-      <div><strong>AI processing</strong><span>Pose analysis produces reps, form score, and flags.</span></div>
-      <div><strong>Review results</strong><span>Authority views rankings, videos, analytics, and exports.</span></div>
+      <div><span class="step-pill">01</span><strong>Create test</strong><span>Authority schedules exercises and invites athletes.</span></div>
+      <div><span class="step-pill">02</span><strong>Submit video</strong><span>Athlete records and uploads the required movement.</span></div>
+      <div><span class="step-pill">03</span><strong>AI processing</strong><span>Pose analysis produces reps, form score, and flags.</span></div>
+      <div><span class="step-pill">04</span><strong>Review results</strong><span>Authority views rankings, videos, analytics, and exports.</span></div>
     </div>
   </section>
 
@@ -95,10 +124,10 @@
       <h2>Clear, practical outputs</h2>
     </div>
     <div class="feature-list">
-      <div><strong>Rep counting</strong><span>Push-ups, squats, sit-ups, lunges, jumping jacks, and vertical jump.</span></div>
-      <div><strong>Form scoring</strong><span>0-100 score with grade, phase scores, benchmarks, and recommendations.</span></div>
-      <div><strong>Authenticity flags</strong><span>Marks low-confidence or suspicious submissions for review.</span></div>
-      <div><strong>Authority tools</strong><span>Test creation, registered/completed analytics, leaderboards, video review, and exports.</span></div>
+      <div><span class="feature-icon">R</span><p><strong>Rep counting</strong><span>Push-ups, squats, sit-ups, lunges, jumping jacks, and vertical jump.</span></p></div>
+      <div><span class="feature-icon">F</span><p><strong>Form scoring</strong><span>0-100 score with grade, phase scores, benchmarks, and recommendations.</span></p></div>
+      <div><span class="feature-icon">A</span><p><strong>Authenticity flags</strong><span>Marks low-confidence or suspicious submissions for review.</span></p></div>
+      <div><span class="feature-icon">T</span><p><strong>Authority tools</strong><span>Test creation, registered/completed analytics, leaderboards, video review, and exports.</span></p></div>
     </div>
   </section>
 
@@ -109,11 +138,13 @@
     </div>
     <div class="access-grid">
       <article>
+        <span class="access-icon">A</span>
         <h3>Athlete</h3>
         <p>Register for tests, upload videos, view AI results, and track progress.</p>
         <a href="register.html">Create athlete account</a>
       </article>
       <article>
+        <span class="access-icon">S</span>
         <h3>Sports Authority</h3>
         <p>Create assessments, manage registrations, review submissions, and shortlist athletes.</p>
         <a href="register.html">Create authority account</a>

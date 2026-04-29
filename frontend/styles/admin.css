@@ -241,6 +241,41 @@ select option { background: var(--color-surface); color: var(--color-text); }
 .video-body video { width: 100%; max-height: 72vh; border-radius: var(--radius-md); background: #000; }
 
 /* RECENT ACTIVITY */
+.recent-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.recent-card .section-header {
+  flex: 0 0 auto;
+}
+
+#recent-activity {
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: var(--sp-2);
+  scrollbar-gutter: stable;
+}
+
+#recent-activity::-webkit-scrollbar {
+  width: 8px;
+}
+
+#recent-activity::-webkit-scrollbar-track {
+  background: var(--color-surface-2);
+  border-radius: 99px;
+}
+
+#recent-activity::-webkit-scrollbar-thumb {
+  background: var(--color-border-2);
+  border-radius: 99px;
+}
+
+#recent-activity::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-4);
+}
+
 .activity-item { display: flex; justify-content: space-between; align-items: center; padding: var(--sp-3) 0; border-bottom: 1px solid var(--color-border); }
 .activity-item:last-child { border-bottom: none; }
 
