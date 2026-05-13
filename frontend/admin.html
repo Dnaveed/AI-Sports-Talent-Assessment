@@ -113,11 +113,9 @@
         <div>
           <div class="card" style="margin-bottom:1rem">
             <div class="section-title" style="margin-bottom:1.25rem">Test Details</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.875rem;margin-bottom:.875rem">
+            <div style="margin-bottom:.875rem">
               <div><label style="font-family:'JetBrains Mono',monospace;font-size:.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:.35rem">Test Name *</label>
-                <input type="text" id="ct-name" placeholder="Football Fitness Trial" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.9rem;padding:.7rem 1rem" onfocus="this.style.borderColor='var(--purple)'" onblur="this.style.borderColor=''"></div>
-              <div><label style="font-family:'JetBrains Mono',monospace;font-size:.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:.35rem">Sport *</label>
-                <input type="text" id="ct-sport" placeholder="Football" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.9rem;padding:.7rem 1rem" onfocus="this.style.borderColor='var(--purple)'" onblur="this.style.borderColor=''"></div>
+                <input type="text" id="ct-name" placeholder="" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.9rem;padding:.7rem 1rem" onfocus="this.style.borderColor='var(--purple)'" onblur="this.style.borderColor=''"></div>
             </div>
             <div style="margin-bottom:.875rem"><label style="font-family:'JetBrains Mono',monospace;font-size:.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:.35rem">Description</label>
               <textarea id="ct-desc" rows="2" placeholder="Brief description of the test..." style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.9rem;padding:.7rem 1rem;resize:vertical" onfocus="this.style.borderColor='var(--purple)'" onblur="this.style.borderColor=''"></textarea></div>
@@ -147,8 +145,7 @@
             <div class="section-title" style="margin-bottom:.875rem">Targeting & Roster</div>
             <div style="margin-bottom:.875rem"><label style="font-family:'JetBrains Mono',monospace;font-size:.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:.35rem">Target Athlete Emails (optional)</label>
               <input type="text" id="ct-target-emails" placeholder="email1@example.com, email2@example.com" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.9rem;padding:.7rem 1rem" onfocus="this.style.borderColor='var(--purple)'" onblur="this.style.borderColor=''"></div>
-            <div><label style="font-family:'JetBrains Mono',monospace;font-size:.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:.35rem">Assigned Roster (optional)</label>
-              <input type="text" id="ct-roster" placeholder="e.g., Football Team, Cohort B" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'Outfit',sans-serif;font-size:.9rem;padding:.7rem 1rem" onfocus="this.style.borderColor='var(--purple)'" onblur="this.style.borderColor=''"></div>
+        
           </div>
 
           <div id="ct-error" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:.65rem 1rem;font-size:.82rem;color:var(--red);margin-bottom:.875rem;display:none"></div>
@@ -427,7 +424,7 @@ function parseCsvList(value) {
 }
 
 function clearTestForm() {
-  ['ct-name','ct-sport','ct-desc','ct-date','ct-time','ct-duration','ct-target-emails','ct-roster'].forEach(id => {
+  ['ct-name','ct-desc','ct-date','ct-time','ct-duration','ct-target-emails','ct-roster'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = id === 'ct-duration' ? '60' : '';
   });
@@ -528,7 +525,7 @@ function buildTestPayload() {
   const targetEmails = parseCsvList(document.getElementById('ct-target-emails').value);
   const checked = [...document.querySelectorAll('#ct-exercise-grid input:checked')].map(cb => cb.value);
 
-  if (!name || !sport || !date || !time || !checked.length) {
+  if (!name || !date || !time || !checked.length) {
     return null;
   }
 
